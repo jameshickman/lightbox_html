@@ -255,9 +255,10 @@
     // Back-button / gesture integration: opening pushes a history entry so the
     // hardware/browser back closes the overlay instead of leaving the page.
     function onPopState() {
-      if (!isOpen) return;
-      historyPushed = false; /* the browser already popped our entry */
-      doClose();
+      // A real Back/gesture fired while open — the browser already moved off our
+      // pushed entry, so just tear down. (Our own cleanup back() in close()
+      // can't reach here: doClose() removes this listener first.)
+      if (isOpen) doClose();
     }
 
     function open(href) {
@@ -287,21 +288,29 @@
       if (closeBtn && closeBtn.focus) closeBtn.focus();
     }
 
-    // User-initiated close (button / backdrop / Esc). Unwinds our history entry
-    // so the URL/history is left clean; the resulting popstate does the teardown.
+    // User-initiated close (button / backdrop / Esc). Tear the overlay down
+    // SYNCHRONOUSLY so it always dismisses, then unwind our history entry. We do
+    // NOT wait for a popstate to do the teardown: some browsers leave an iframe
+    // history entry on top of ours, so history.back() would rewind the iframe
+    // (blanking it) without firing a parent popstate — leaving the overlay stuck
+    // open. Closing first, cleaning history second, is robust to that.
     function close() {
       if (!isOpen) return;
-      if (historyPushed) {
-        historyPushed = false;
-        window.history.back();
-        return;
-      }
+      var wasPushed = historyPushed;
       doClose();
+      if (wasPushed) {
+        try {
+          window.history.back();
+        } catch (e) {
+          /* history unavailable — nothing to unwind */
+        }
+      }
     }
 
     function doClose() {
-      if (!overlay) return;
+      if (!isOpen) return;
       isOpen = false;
+      historyPushed = false;
       overlay.className = "lbg-lightbox";
       navigateFrame("about:blank");
       if (document.body) {

@@ -104,6 +104,36 @@ test.describe("demo page", () => {
     await expect(page.locator("body")).not.toHaveClass(/lbg-lightbox-open/);
   });
 
+  test("close (×) button dismisses the lightbox", async ({ page }) => {
+    const widget = page.locator(".lbg").nth(2);
+    await widget.locator(".lbg__masonry .lbg__link").first().click();
+    const overlay = page.locator(".lbg-lightbox");
+    await expect(overlay).toHaveClass(/is-open/);
+
+    await page.locator(".lbg-lightbox__close").click();
+    await expect(overlay).not.toHaveClass(/is-open/);
+    await expect(page.locator("body")).not.toHaveClass(/lbg-lightbox-open/);
+    await expect(page).toHaveURL(/index\.html$/);
+  });
+
+  test("close (×) still dismisses after close + reopen", async ({ page }) => {
+    // Regression: the × must not depend on an async popstate to tear down.
+    const widget = page.locator(".lbg").nth(2);
+    const link = widget.locator(".lbg__masonry .lbg__link").first();
+    const overlay = page.locator(".lbg-lightbox");
+    const closeBtn = page.locator(".lbg-lightbox__close");
+
+    await link.click();
+    await expect(overlay).toHaveClass(/is-open/);
+    await closeBtn.click();
+    await expect(overlay).not.toHaveClass(/is-open/);
+
+    await link.click();
+    await expect(overlay).toHaveClass(/is-open/);
+    await closeBtn.click();
+    await expect(overlay).not.toHaveClass(/is-open/);
+  });
+
   test("backdrop click closes the lightbox", async ({ page }) => {
     const widget = page.locator(".lbg").first(); // carousel
     await widget.locator(".lbg__carousel .lbg__link").first().click();
