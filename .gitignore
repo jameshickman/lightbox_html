@@ -6,3 +6,10 @@
 # OS files
 .DS_Store
 Thumbs.db
+
+# Node / testing
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/.playwright/

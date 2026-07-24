@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lightbox Grid — Carousel / Masonry Demo</title>
+  <link rel="stylesheet" href="src/lightbox-grid.css">
+  <style>
+    /* Page chrome only — NOT part of the widget. */
+    body {
+      margin: 0;
+      background: #0d0f13;
+      color: #e8eaed;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+      line-height: 1.5;
+    }
+    .page { max-width: 1080px; margin: 0 auto; padding: 40px 20px 80px; }
+    .page h1 { margin: 0 0 6px; font-size: 1.9rem; }
+    .page .sub { color: #9aa3ad; margin: 0 0 40px; }
+    .demo { margin-bottom: 56px; }
+    .demo > h2 { font-size: 1.15rem; margin: 0 0 4px; }
+    .demo > p { color: #9aa3ad; margin: 0 0 16px; font-size: 0.95rem; }
+    code { background: #1e2228; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+    a.repo { color: #6ea8fe; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>Lightbox Grid</h1>
+    <p class="sub">
+      A dependency-free carousel / masonry widget with a same-origin iframe
+      lightbox. See <a class="repo" href="test.html">test.html</a> for the
+      automated + manual test harness.
+    </p>
+
+    <!-- Demo 1: default (carousel) with toggle + autoplay -->
+    <section class="demo">
+      <h2>1. Carousel (default) &middot; toggle enabled &middot; 4s autoplay</h2>
+      <p><code>data-mode="carousel" data-timer="4000"</code> — autoplay pauses on
+        hover/focus and stops on manual navigation. Click any slide to open it in
+        the lightbox.</p>
+
+      <ul rel="lightbox-grid" data-mode="carousel" data-timer="4000">
+        <li><ul>
+          <li><img src="images/img1.svg" width="400" height="300" alt="Aurora"></li>
+          <li><a href="pages/page-1.html">Aurora — northern light fields</a></li>
+        </ul></li>
+        <li><ul>
+          <li><img src="images/img2.svg" width="400" height="520" alt="Coral"></li>
+          <li><a href="pages/page-2.html">Coral — warm reef mornings</a></li>
+        </ul></li>
+        <li><ul>
+          <li><img src="images/img3.svg" width="400" height="260" alt="Meadow"></li>
+          <li><a href="pages/page-3.html">Meadow — green rolling calm</a></li>
+        </ul></li>
+        <li><ul>
+          <li><img src="images/img4.svg" width="400" height="400" alt="Amber"></li>
+          <li><a href="pages/page-4.html">Amber — golden hour glow</a></li>
+        </ul></li>
+        <li><ul>
+          <li><img src="images/img5.svg" width="400" height="600" alt="Violet"></li>
+          <li><a href="pages/page-5.html">Violet — deep dusk hues</a></li>
+        </ul></li>
+        <li><ul>
+          <li><img src="images/img6.svg" width="400" height="340" alt="Lagoon"></li>
+          <li><a href="pages/page-6.html">Lagoon — still tidal blue</a></li>
+        </ul></li>
+      </ul>
+    </section>
+
+    <!-- Demo 2: masonry default, toggle enabled -->
+    <section class="demo">
+      <h2>2. Masonry (default) &middot; toggle enabled</h2>
+      <p><code>data-mode="masonry"</code> — best-fit columns from the images'
+        intrinsic dimensions; switch to carousel with the toggle.</p>
+
+      <ul rel="lightbox-grid" data-mode="masonry">
+        <li><ul>
+          <li><img src="images/img4.svg" width="400" height="400" alt="Amber"></li>
+          <li><a href="pages/page-4.html">Amber</a></li>
+        </ul></li>
+        <li><ul>
+          <li><img src="images/img1.svg" width="400" height="300" alt="Aurora"></li>
+          <li><a href="pages/page-1.html">Aurora</a></li>
+        </ul></li>
+        <li><ul>
+          <li><img src="images/img5.svg" width="400" height="600" alt="Violet"></li>
+          <li><a href="pages/page-5.html">Violet</a></li>
+        </ul></li>
+        <li><ul>
+          <li><img src="images/img3.svg" width="400" height="260" alt="Meadow"></li>
+          <li><a href="pages/page-3.html">Meadow</a></li>
+        </ul></li>
+        <li><ul>
+          <li><img src="images/img6.svg" width="400" height="340" alt="Lagoon"></li>
+          <li><a href="pages/page-6.html">Lagoon</a></li>
+        </ul></li>
+        <li><ul>
+          <li><img src="images/img2.svg" width="400" height="520" alt="Coral"></li>
+          <li><a href="pages/page-2.html">Coral</a></li>
+        </ul></li>
+      </ul>
+    </section>
+
+    <!-- Demo 3: masonry with the toggle DISABLED -->
+    <section class="demo">
+      <h2>3. Masonry &middot; toggle <em>disabled</em></h2>
+      <p><code>data-mode="masonry" data-toggle="off"</code> — the mode-switch UI
+        is suppressed and the widget is locked to masonry.</p>
+
+      <ul rel="lightbox-grid" data-mode="masonry" data-toggle="off">
+        <li><ul>
+          <li><img src="images/img1.svg" width="400" height="300" alt="Aurora"></li>
+          <li><a href="pages/page-1.html">Aurora</a></li>
+        </ul></li>
+        <li><ul>
+          <li><img src="images/img2.svg" width="400" height="520" alt="Coral"></li>
+          <li><a href="pages/page-2.html">Coral</a></li>
+        </ul></li>
+        <li><ul>
+          <li><img src="images/img6.svg" width="400" height="340" alt="Lagoon"></li>
+          <li><a href="pages/page-6.html">Lagoon</a></li>
+        </ul></li>
+        <li><ul>
+          <li><img src="images/img3.svg" width="400" height="260" alt="Meadow"></li>
+          <li><a href="pages/page-3.html">Meadow</a></li>
+        </ul></li>
+      </ul>
+    </section>
+  </div>
+
+  <script src="src/lightbox-grid.js"></script>
+</body>
+</html>

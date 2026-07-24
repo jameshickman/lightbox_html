@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lightbox Grid — Test Harness</title>
+  <link rel="stylesheet" href="src/lightbox-grid.css">
+  <style>
+    body {
+      margin: 0; padding: 24px;
+      background: #0d0f13; color: #e8eaed;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+    h1 { font-size: 1.4rem; }
+    #summary { font-weight: 700; margin: 12px 0; font-size: 1.05rem; }
+    #summary.pass { color: #51cf66; }
+    #summary.fail { color: #ff6b6b; }
+    #results { list-style: none; padding: 0; margin: 0 0 32px; max-width: 900px; }
+    #results li {
+      padding: 8px 12px; border-radius: 6px; margin-bottom: 6px;
+      font-size: 0.92rem; font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    }
+    #results li.ok  { background: #12301b; color: #9be9a8; }
+    #results li.ok::before  { content: "PASS  "; font-weight: 700; }
+    #results li.err { background: #3a1414; color: #ffb3b3; }
+    #results li.err::before { content: "FAIL  "; font-weight: 700; }
+    .fixtures { border-top: 1px solid #333a44; padding-top: 24px; }
+    .fixtures h2 { font-size: 1rem; color: #9aa3ad; }
+  </style>
+</head>
+<body>
+  <h1>Lightbox Grid — Test Harness</h1>
+  <p>Automated assertions run on load. The same assertions run headless via
+     Playwright (<code>npm test</code>), keying off <code>#summary</code>.</p>
+
+  <div id="summary" data-status="running">Running…</div>
+  <ul id="results"></ul>
+
+  <div class="fixtures">
+    <h2>Live fixtures (used by the tests)</h2>
+
+    <!-- Fixture A: carousel with toggle + autoplay -->
+    <ul id="fixtureA" rel="lightbox-grid" data-mode="carousel" data-timer="3000">
+      <li><ul>
+        <li><img src="images/img1.svg" width="400" height="300" alt="Aurora"></li>
+        <li><a href="pages/page-1.html">Aurora</a></li>
+      </ul></li>
+      <li><ul>
+        <li><img src="images/img2.svg" width="400" height="520" alt="Coral"></li>
+        <li><a href="pages/page-2.html">Coral</a></li>
+      </ul></li>
+      <li><ul>
+        <li><img src="images/img3.svg" width="400" height="260" alt="Meadow"></li>
+        <li><a href="pages/page-3.html">Meadow</a></li>
+      </ul></li>
+    </ul>
+
+    <!-- Fixture B: masonry with toggle disabled -->
+    <ul id="fixtureB" rel="lightbox-grid" data-mode="masonry" data-toggle="off">
+      <li><ul>
+        <li><img src="images/img4.svg" width="400" height="400" alt="Amber"></li>
+        <li><a href="pages/page-4.html">Amber</a></li>
+      </ul></li>
+      <li><ul>
+        <li><img src="images/img5.svg" width="400" height="600" alt="Violet"></li>
+        <li><a href="pages/page-5.html">Violet</a></li>
+      </ul></li>
+      <li><ul>
+        <li><img src="images/img6.svg" width="400" height="340" alt="Lagoon"></li>
+        <li><a href="pages/page-6.html">Lagoon</a></li>
+      </ul></li>
+    </ul>
+  </div>
+
+  <script src="src/lightbox-grid.js"></script>
+  <script>
+  (function () {
+    var results = document.getElementById("results");
+    var passed = 0, failed = 0;
+
+    function log(ok, msg) {
+      var li = document.createElement("li");
+      li.className = ok ? "ok" : "err";
+      li.textContent = msg;
+      results.appendChild(li);
+      if (ok) passed++; else failed++;
+    }
+    function assert(cond, msg) { log(!!cond, msg); }
+    function eq(a, b, msg) {
+      log(a === b, msg + "  (expected " + b + ", got " + a + ")");
+    }
+
+    function widgetAfter(sourceUl) {
+      // The enhanced widget root is inserted right after the source list.
+      var n = sourceUl.nextSibling;
+      while (n && n.nodeType !== 1) n = n.nextSibling;
+      return n;
+    }
+
+    function run() {
+      var fA = document.getElementById("fixtureA");
+      var fB = document.getElementById("fixtureB");
+      var wA = widgetAfter(fA);
+      var wB = widgetAfter(fB);
+
+      // --- Initialization
+      assert(wA && wA.className.indexOf("lbg") === 0, "Fixture A enhanced into .lbg root");
+      assert(fA.className.indexOf("lbg-source--enhanced") > -1, "Source A hidden after enhancement");
+      eq(wA.querySelectorAll(".lbg__slide").length, 3, "Carousel A has 3 slides");
+      eq(wA.querySelectorAll(".lbg__dot").length, 3, "Carousel A has 3 dots");
+      assert(wA.className.indexOf("lbg--carousel") > -1, "Fixture A starts in carousel mode");
+
+      // --- Mode toggle present on A, absent on B
+      assert(wA.querySelector(".lbg__modes"), "Toggle UI present on Fixture A");
+      assert(!wB.querySelector(".lbg__modes"), "Toggle UI suppressed on Fixture B (data-toggle=off)");
+      assert(wB.className.indexOf("lbg--masonry") > -1, "Fixture B locked to masonry");
+
+      // --- Carousel navigation via API
+      var instA = window.LightboxGrid.instances[0];
+      instA.go(1, false);
+      eq(instA.current, 1, "go(1) advances to slide index 1");
+      instA.go(instA.items.length, false); // wrap to 0
+      eq(instA.current, 0, "go wraps past the end back to 0");
+      instA.go(-1, false); // wrap to last
+      eq(instA.current, instA.items.length - 1, "go(-1) wraps to last slide");
+
+      // --- Track transform reflects current slide
+      var transform = wA.querySelector(".lbg__track").style.transform;
+      assert(/translateX\(/.test(transform), "Track uses translateX transform: " + transform);
+
+      // --- Mode switching
+      var beforeBtn = wA.querySelector(".lbg__mode-btn");
+      instA.setMode("masonry");
+      assert(wA.className.indexOf("lbg--masonry") > -1, "setMode('masonry') updates root class");
+      instA.setMode("carousel");
+      assert(wA.className.indexOf("lbg--carousel") > -1, "setMode('carousel') restores carousel");
+
+      // --- Masonry layout (Fixture B is visible & masonry by default)
+      var mB = wB.querySelector(".lbg__masonry");
+      var itemsB = mB.querySelectorAll(".lbg__item");
+      eq(itemsB.length, 3, "Masonry B rendered 3 items");
+      var allPositioned = true, anyHeight = false;
+      for (var i = 0; i < itemsB.length; i++) {
+        var pos = window.getComputedStyle(itemsB[i]).position;
+        if (pos !== "absolute") allPositioned = false;
+        if (parseInt(itemsB[i].style.top, 10) >= 0 && itemsB[i].style.left !== "") anyHeight = true;
+      }
+      assert(allPositioned, "Masonry items are absolutely positioned");
+      assert(anyHeight, "Masonry items have computed left/top offsets");
+      assert(parseInt(mB.style.height, 10) > 0, "Masonry container has a computed height (" + mB.style.height + ")");
+      assert(mB.className.indexOf("is-unlaid") === -1, "Masonry dropped the is-unlaid fallback after layout");
+
+      // --- Lightbox: opens on link click, injects styles, closes on Esc (async)
+      testLightbox(wB, finish);
+    }
+
+    function testLightbox(widget, done) {
+      var overlaySel = ".lbg-lightbox";
+      var link = widget.querySelector(".lbg__link");
+      assert(!!link, "Found a link to open the lightbox");
+
+      // Simulate a click on the link.
+      var ev;
+      try { ev = new MouseEvent("click", { bubbles: true, cancelable: true }); }
+      catch (e) { ev = document.createEvent("MouseEvents"); ev.initEvent("click", true, true); }
+      link.dispatchEvent(ev);
+
+      var overlay = document.querySelector(overlaySel);
+      assert(overlay && overlay.className.indexOf("is-open") > -1, "Lightbox opened on link click");
+      var frame = overlay.querySelector(".lbg-lightbox__frame");
+      assert(frame && /page-/.test(frame.getAttribute("src")), "Iframe src set to the linked page");
+      assert(/lbg-lightbox-open/.test(document.body.className), "Body scroll lock applied");
+
+      var settled = false;
+      function afterLoad() {
+        if (settled) return; settled = true;
+        // Same-origin: injected style should exist and nav/footer hidden.
+        var injected = null, navHidden = null;
+        try {
+          var doc = frame.contentDocument || frame.contentWindow.document;
+          injected = doc.querySelector("style[data-lbg-injected]");
+          var nav = doc.querySelector("nav");
+          navHidden = nav && window.getComputedStyle(nav).display === "none";
+          var main = doc.querySelector("main");
+          assert(main && window.getComputedStyle(main).display !== "none", "Main content region kept visible in lightbox");
+        } catch (e) {
+          log(false, "Could not access iframe document (unexpected same-origin failure): " + e);
+        }
+        assert(!!injected, "Content-hiding CSS injected into iframe");
+        assert(navHidden === true, "Nav hidden inside lightbox");
+
+        // Close via Escape.
+        var kev;
+        try { kev = new KeyboardEvent("keydown", { key: "Escape", bubbles: true }); }
+        catch (e2) { kev = document.createEvent("Event"); kev.initEvent("keydown", true, true); kev.key = "Escape"; }
+        document.dispatchEvent(kev);
+        assert(document.querySelector(overlaySel).className.indexOf("is-open") === -1, "Lightbox closed on Escape");
+        assert(!/lbg-lightbox-open/.test(document.body.className), "Body scroll lock removed on close");
+
+        done();
+      }
+
+      frame.addEventListener("load", afterLoad);
+      // Fallback in case the load already fired.
+      setTimeout(function () { if (!settled) afterLoad(); }, 2500);
+    }
+
+    function finish() {
+      var summary = document.getElementById("summary");
+      var total = passed + failed;
+      if (failed === 0) {
+        summary.className = "pass";
+        summary.textContent = "ALL PASSED — " + passed + "/" + total;
+        summary.setAttribute("data-status", "pass");
+      } else {
+        summary.className = "fail";
+        summary.textContent = failed + " FAILED — " + passed + "/" + total + " passed";
+        summary.setAttribute("data-status", "fail");
+      }
+    }
+
+    // Widgets auto-init on DOMContentLoaded; run tests just after.
+    if (document.readyState === "complete") {
+      setTimeout(run, 0);
+    } else {
+      window.addEventListener("load", function () { setTimeout(run, 0); });
+    }
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "lightbox-grid",
+  "version": "0.1.0",
+  "description": "Dependency-free carousel / masonry grid widget with a same-origin iframe lightbox.",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "serve": "npx --yes http-server -p 8137 -c-1 ."
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0"
+  }
+}

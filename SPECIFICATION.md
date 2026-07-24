@@ -4,6 +4,13 @@ A pure front-end JavaScript widget that renders a list of image + linked-text
 items as either a **carousel** or a **masonry grid**, and opens each linked
 page inside a **lightbox overlay** showing only that page's main content.
 
+> **Status: implemented.** The widget lives in `src/lightbox-grid.js` and
+> `src/lightbox-grid.css`. A demo (`index.html`) and an in-browser test harness
+> (`test.html`) sit in the project root, with same-origin content pages under
+> `pages/` and placeholder images under `images/`. Automated end-to-end tests
+> run under Playwright (`npm test`, Chromium + Firefox). See
+> [Repository Layout](#repository-layout) and [Running](#running--testing).
+
 ## Constraints
 
 - **Pure vanilla JavaScript, no external dependencies** (no frameworks, no build step required).
@@ -38,8 +45,9 @@ attribute and manages each one. Expected structure:
 
 Rules:
 
-- The **outer `<ul>`** carries `rel="lightbox-grid"` (exact `rel` token TBD —
-  used only as the activation flag).
+- The **outer `<ul>`** carries the `rel` token **`lightbox-grid`**, used only as
+  the activation flag. Matching is space-token aware (`rel~="lightbox-grid"`), so
+  additional `rel` tokens may coexist.
 - Each **outer `<li>`** is one item and contains an **inner `<ul>`** with:
   - one `<li>` holding an `<img>`, and
   - one `<li>` holding an `<a href>` with the item's text label.
@@ -51,11 +59,18 @@ Rules:
 
 ## Configuration (data-attributes on the outer `<ul>`)
 
-| Attribute    | Purpose                                         | Default    |
-| ------------ | ----------------------------------------------- | ---------- |
-| `rel`        | Activation flag                                 | required   |
-| `data-mode`  | Initial display mode: `carousel` or `masonry`   | `carousel` |
-| `data-timer` | Carousel autoplay interval in milliseconds      | see below  |
+| Attribute     | Purpose                                                             | Default            |
+| ------------- | ------------------------------------------------------------------- | ------------------ |
+| `rel`         | Activation flag (token `lightbox-grid`)                             | required           |
+| `data-mode`   | Initial display mode: `carousel` or `masonry`                       | `carousel`         |
+| `data-timer`  | Carousel autoplay interval in milliseconds                          | autoplay **off**   |
+| `data-toggle` | `off` / `disabled` / `false` / `none` hides the mode-toggle UI      | toggle **enabled** |
+
+- **`data-timer`**: autoplay is enabled **only** when a positive `data-timer` is
+  present. When the attribute is absent (or non-positive), the carousel does not
+  autoplay and is arrows/dots/keyboard only.
+- **`data-toggle`**: when disabled, the widget is locked to `data-mode` and no
+  toggle control is rendered.
 
 ## Display Modes
 
@@ -65,17 +80,23 @@ runtime via a **toggle UI element** the widget renders.
 - **Default mode: Carousel.**
 - A visible toggle control lets the user switch between carousel and masonry.
 - `data-mode` sets the initial mode; the toggle overrides it thereafter.
+- The toggle can be suppressed with `data-toggle="off"`, locking the widget to
+  `data-mode` (see the configuration table above).
 
 ### Carousel
 
 - Each image + link pair is rendered as a carousel slide.
-- **Navigation arrows** (previous / next) are always available.
-- **Autoplay:** advances automatically every `data-timer` milliseconds.
+- **Navigation arrows** (previous / next) and **dot indicators** are always
+  available; slides wrap around at both ends.
+- **Autoplay:** when `data-timer` is a positive number, slides advance
+  automatically every `data-timer` milliseconds.
   - Autoplay **pauses on hover and on keyboard focus** within the carousel.
-  - Autoplay **pauses when the user manually navigates** (arrow click / key).
-  - If `data-timer` is absent, define a sensible default (e.g. `5000` ms) or
-    treat autoplay as off — TBD, but pausable-autoplay is the intended model.
-- Should be keyboard accessible (arrow keys, focusable controls, ARIA labels).
+  - Autoplay **stops when the user manually navigates** (arrow / dot / arrow key)
+    for the remainder of the session.
+  - Autoplay is **off by default** — it runs only when `data-timer` is present
+    and positive. It is also suppressed when `prefers-reduced-motion` is set.
+- Keyboard accessible: arrow keys navigate; controls are focusable with ARIA
+  labels.
 
 ### Masonry Grid
 
@@ -94,8 +115,11 @@ When an item's link is activated:
 3. The widget **injects CSS into the iframe document** to hide the page's
    navigation and footer, showing **only the main semantic content region**.
    - Region identification uses **standard HTML5 semantic landmarks**:
-     - **Keep/show:** `<main>` (or `<article>` as the content region).
-     - **Hide:** `<nav>`, `<header>`, `<footer>`.
+     - **Keep/show:** `<main>`, `<article>`, and `[role="main"]` (the content
+       region). No single-element choice is required — all matching content
+       regions remain visible while the surrounding chrome is hidden.
+     - **Hide:** `<nav>`, `<header>`, `<footer>`, and their ARIA equivalents
+       (`[role="navigation"]`, `[role="banner"]`, `[role="contentinfo"]`).
    - (The original spec's "nsv" is read as a typo for the **nav** section.)
 4. The overlay provides a close affordance (button, `Esc` key, and backdrop
    click), returns focus to the triggering link on close, and should trap focus
@@ -125,8 +149,55 @@ When an item's link is activated:
 - Keyboard support: navigate carousel, operate toggle, close lightbox with `Esc`.
 - Respect `prefers-reduced-motion` for autoplay/transitions where feasible.
 
-## Open Questions / To Confirm
+## Resolved Decisions
 
-- Exact `rel` token value (`lightbox-grid`? something else?).
-- Default `data-timer` when the attribute is omitted (5000 ms vs. autoplay off).
-- Whether the content region is `<main>` or `<article>` when both are present.
+Previously-open questions, now settled and reflected in the implementation:
+
+- **`rel` token** — `lightbox-grid`, matched space-token aware (`rel~=`).
+- **`data-timer` default** — autoplay is **off** unless a positive `data-timer`
+  is provided (no implicit default interval).
+- **Content region when several exist** — all of `<main>`, `<article>`, and
+  `[role="main"]` are kept; there is no either/or choice.
+- **Loading strategy** — same-origin `<iframe>` with injected CSS (cross-origin
+  is out of scope).
+- **Mode toggle** — rendered by default; suppressible via `data-toggle="off"`.
+
+## Repository Layout
+
+```
+.
+├── src/
+│   ├── lightbox-grid.js     # the widget (vanilla, ES5-style, no deps)
+│   └── lightbox-grid.css    # BEM + CSS custom properties, dark theme default
+├── index.html               # demo page (three configurations)
+├── test.html                # in-browser assertion harness
+├── images/                  # self-contained SVG placeholders (varied heights)
+├── pages/                   # same-origin content pages loaded by the lightbox
+│   ├── page-1.html … page-6.html
+│   └── page.css
+├── tests/
+│   └── lightbox-grid.spec.js  # Playwright end-to-end tests
+├── playwright.config.js       # serves the project; Chromium + Firefox
+└── package.json               # `npm test`, `npm run serve`
+```
+
+## Running & Testing
+
+- **Serve locally:** `npm run serve`, then open
+  `http://localhost:8137/index.html` (demo) or `/test.html` (live assertions).
+  - Port `8137` is used because `8080` is commonly occupied in this environment.
+- **Automated tests:** `npm test` runs the Playwright suite (Chromium + Firefox).
+  The config starts its own static server, so no manual setup is needed.
+  - First-time setup: `npm install` then `npx playwright install chromium firefox`.
+- `node_modules/` and Playwright output directories are git-ignored.
+
+## Public API
+
+The script auto-initializes on `DOMContentLoaded`. It also exposes
+`window.LightboxGrid`:
+
+- `LightboxGrid.init(root?)` — enhance any not-yet-enhanced flagged lists within
+  `root` (defaults to `document`); returns the instance list.
+- `LightboxGrid.instances` — the live widget instances.
+- `LightboxGrid.Lightbox` — the shared lightbox singleton (`open(href)` / `close()`).
+- `LightboxGrid.REL_TOKEN` — the activation token (`"lightbox-grid"`).
