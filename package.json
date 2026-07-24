@@ -2,6 +2,8 @@
   "name": "lightbox-grid",
   "version": "0.1.0",
   "description": "Dependency-free carousel / masonry grid widget with a same-origin iframe lightbox.",
+  "license": "MIT",
+  "author": "James Hickman",
   "private": true,
   "scripts": {
     "test": "playwright test",
