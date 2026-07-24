@@ -17,7 +17,9 @@ module.exports = defineConfig({
   webServer: {
     command: "npx --yes http-server -p " + PORT + " -c-1 .",
     url: "http://localhost:" + PORT + "/index.html",
-    reuseExistingServer: false,
+    // Reuse a server already listening on PORT (e.g. `npm run serve`); otherwise
+    // start one. Safe here because PORT is uncommon and serves this project.
+    reuseExistingServer: true,
     timeout: 30000
   },
   projects: [

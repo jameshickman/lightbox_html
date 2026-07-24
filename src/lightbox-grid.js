@@ -28,6 +28,7 @@
   var REL_TOKEN = "lightbox-grid";
   var MASONRY_MIN_COL = 220; /* px: target minimum column width */
   var DEFAULT_TIMER = 5000; /* used only when data-timer is a bare/invalid value */
+  var DEFAULT_MOBILE_BP = 640; /* px: at/below this width, links navigate directly */
   var idCounter = 0;
 
   /* ---- small helpers ---------------------------------------------------- */
@@ -127,6 +128,7 @@
     var lastFocused = null;
     var keydownHandler = null;
     var isOpen = false;
+    var historyPushed = false;
 
     function build() {
       if (overlay) return;
@@ -150,6 +152,7 @@
 
       frame = el("iframe", "lbg-lightbox__frame");
       frame.setAttribute("title", "Linked content");
+      frame.setAttribute("src", "about:blank");
 
       dialog.appendChild(closeBtn);
       dialog.appendChild(spinner);
@@ -163,6 +166,24 @@
       closeBtn.onclick = close;
 
       frame.onload = onFrameLoad;
+    }
+
+    // Navigate the iframe WITHOUT adding a browser-history entry. Setting
+    // `src` performs an async navigation that commits its own history entry
+    // *after* our pushState, which would make the first Back rewind the iframe
+    // (to about:blank) instead of closing the overlay. location.replace() keeps
+    // the joint session history clean so our single pushed entry governs Back.
+    function navigateFrame(url) {
+      try {
+        var w = frame.contentWindow;
+        if (w && w.location && w.location.replace) {
+          w.location.replace(url);
+          return;
+        }
+      } catch (e) {
+        /* fall through to the attribute assignment */
+      }
+      frame.setAttribute("src", url);
     }
 
     // CSS injected into the loaded (same-origin) page: hide the nav / header /
@@ -231,26 +252,58 @@
       }
     }
 
+    // Back-button / gesture integration: opening pushes a history entry so the
+    // hardware/browser back closes the overlay instead of leaving the page.
+    function onPopState() {
+      if (!isOpen) return;
+      historyPushed = false; /* the browser already popped our entry */
+      doClose();
+    }
+
     function open(href) {
       build();
       isOpen = true;
       lastFocused = document.activeElement;
       overlay.className = "lbg-lightbox is-open"; /* not yet loaded */
-      frame.setAttribute("src", href);
+      navigateFrame(href);
       if (document.body) {
         document.body.className += " lbg-lightbox-open";
       }
       keydownHandler = onKeydown;
       document.addEventListener("keydown", keydownHandler, true);
+
+      historyPushed = false;
+      if (window.history && window.history.pushState) {
+        try {
+          window.history.pushState({ lbgLightbox: true }, "");
+          historyPushed = true;
+        } catch (e) {
+          historyPushed = false;
+        }
+        window.addEventListener("popstate", onPopState);
+      }
+
       // Move focus into the dialog.
       if (closeBtn && closeBtn.focus) closeBtn.focus();
     }
 
+    // User-initiated close (button / backdrop / Esc). Unwinds our history entry
+    // so the URL/history is left clean; the resulting popstate does the teardown.
     function close() {
+      if (!isOpen) return;
+      if (historyPushed) {
+        historyPushed = false;
+        window.history.back();
+        return;
+      }
+      doClose();
+    }
+
+    function doClose() {
       if (!overlay) return;
       isOpen = false;
       overlay.className = "lbg-lightbox";
-      frame.setAttribute("src", "about:blank");
+      navigateFrame("about:blank");
       if (document.body) {
         document.body.className = document.body.className
           .replace(/\s*lbg-lightbox-open/g, "")
@@ -260,6 +313,7 @@
         document.removeEventListener("keydown", keydownHandler, true);
         keydownHandler = null;
       }
+      window.removeEventListener("popstate", onPopState);
       if (lastFocused && lastFocused.focus) {
         lastFocused.focus();
       }
@@ -295,6 +349,13 @@
       toggleAttr === "disabled" ||
       toggleAttr === "false" ||
       toggleAttr === "none"
+    );
+
+    // On narrow (mobile) viewports, links navigate directly instead of opening
+    // the modal lightbox. The threshold is configurable per widget.
+    this.mobileBreakpoint = toInt(
+      sourceUl.getAttribute("data-mobile-breakpoint"),
+      DEFAULT_MOBILE_BP
     );
 
     this.current = 0;
@@ -339,12 +400,17 @@
     this.source.className += " lbg-source--enhanced";
 
     // Delegate link activation -> lightbox (same handler for both modes).
+    // On mobile viewports, do NOT intercept: let the link navigate directly.
+    // Modifier-clicks (new tab/window) are always left to the browser.
     root.addEventListener("click", function (e) {
       var link = closestLink(e.target, root);
-      if (link) {
-        e.preventDefault();
-        Lightbox.open(link.getAttribute("href"));
+      if (!link) return;
+      if (self.isMobile()) return; /* direct navigation on mobile */
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button === 1) {
+        return; /* honor open-in-new-tab / new-window intents */
       }
+      e.preventDefault();
+      Lightbox.open(link.getAttribute("href"));
     });
 
     this.updateModeUI();
@@ -622,6 +688,21 @@
     } else {
       this.startAutoplay();
     }
+  };
+
+  // Evaluated at click time, so resize / orientation changes are handled
+  // automatically without listeners.
+  Widget.prototype.isMobile = function () {
+    if (window.matchMedia) {
+      return window.matchMedia(
+        "(max-width: " + this.mobileBreakpoint + "px)"
+      ).matches;
+    }
+    var w =
+      window.innerWidth ||
+      (document.documentElement && document.documentElement.clientWidth) ||
+      0;
+    return w <= this.mobileBreakpoint;
   };
 
   Widget.prototype.updateModeUI = function () {

@@ -156,7 +156,18 @@
 
     function testLightbox(widget, done) {
       var overlaySel = ".lbg-lightbox";
-      var link = widget.querySelector(".lbg__link");
+
+      // On mobile viewports the widget navigates directly (no modal), so a
+      // synthetic click would leave the page. Skip the modal assertions there.
+      var instB = window.LightboxGrid.instances[1];
+      if (instB && instB.isMobile && instB.isMobile()) {
+        log(true, "Skipped lightbox modal tests (mobile: links navigate directly)");
+        done();
+        return;
+      }
+
+      var link = widget.querySelector(".lbg__masonry .lbg__link") ||
+        widget.querySelector(".lbg__link");
       assert(!!link, "Found a link to open the lightbox");
 
       // Simulate a click on the link.
@@ -168,7 +179,6 @@
       var overlay = document.querySelector(overlaySel);
       assert(overlay && overlay.className.indexOf("is-open") > -1, "Lightbox opened on link click");
       var frame = overlay.querySelector(".lbg-lightbox__frame");
-      assert(frame && /page-/.test(frame.getAttribute("src")), "Iframe src set to the linked page");
       assert(/lbg-lightbox-open/.test(document.body.className), "Body scroll lock applied");
 
       var settled = false;
@@ -177,6 +187,9 @@
         // Same-origin: injected style should exist and nav/footer hidden.
         var injected = null, navHidden = null;
         try {
+          // Navigation uses location.replace (keeps history clean), so verify
+          // the iframe's committed location rather than the src attribute.
+          assert(/page-/.test(frame.contentWindow.location.href), "Iframe navigated to the linked page");
           var doc = frame.contentDocument || frame.contentWindow.document;
           injected = doc.querySelector("style[data-lbg-injected]");
           var nav = doc.querySelector("nav");
@@ -189,15 +202,18 @@
         assert(!!injected, "Content-hiding CSS injected into iframe");
         assert(navHidden === true, "Nav hidden inside lightbox");
 
-        // Close via Escape.
+        // Close via Escape. Closing unwinds a history entry (history.back()),
+        // so the teardown happens asynchronously on the popstate event.
         var kev;
         try { kev = new KeyboardEvent("keydown", { key: "Escape", bubbles: true }); }
         catch (e2) { kev = document.createEvent("Event"); kev.initEvent("keydown", true, true); kev.key = "Escape"; }
         document.dispatchEvent(kev);
-        assert(document.querySelector(overlaySel).className.indexOf("is-open") === -1, "Lightbox closed on Escape");
-        assert(!/lbg-lightbox-open/.test(document.body.className), "Body scroll lock removed on close");
 
-        done();
+        setTimeout(function () {
+          assert(document.querySelector(overlaySel).className.indexOf("is-open") === -1, "Lightbox closed on Escape");
+          assert(!/lbg-lightbox-open/.test(document.body.className), "Body scroll lock removed on close");
+          done();
+        }, 60);
       }
 
       frame.addEventListener("load", afterLoad);

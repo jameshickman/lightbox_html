@@ -113,4 +113,58 @@ test.describe("demo page", () => {
     await page.locator(".lbg-lightbox__backdrop").click({ position: { x: 6, y: 6 } });
     await expect(overlay).not.toHaveClass(/is-open/);
   });
+
+  test("back button / history closes the lightbox in one step", async ({ page }) => {
+    const widget = page.locator(".lbg").nth(2);
+    const link = widget.locator(".lbg__masonry .lbg__link").first();
+    const overlay = page.locator(".lbg-lightbox");
+
+    await link.click();
+    await expect(overlay).toHaveClass(/is-open/);
+
+    // A single hardware/browser back must close the overlay, not leave the page.
+    await page.goBack();
+    await expect(overlay).not.toHaveClass(/is-open/);
+    await expect(page).toHaveURL(/index\.html$/);
+  });
+
+  test("back still closes in one step after close + reopen", async ({ page }) => {
+    // Regression: iframe navigations must not accumulate history entries, or a
+    // reopened lightbox would need multiple Backs (first rewinding the iframe).
+    const widget = page.locator(".lbg").nth(2);
+    const link = widget.locator(".lbg__masonry .lbg__link").first();
+    const overlay = page.locator(".lbg-lightbox");
+
+    await link.click();
+    await expect(overlay).toHaveClass(/is-open/);
+    await page.keyboard.press("Escape"); // close (unwinds the history entry)
+    await expect(overlay).not.toHaveClass(/is-open/);
+
+    await link.click(); // reopen
+    await expect(overlay).toHaveClass(/is-open/);
+
+    await page.goBack(); // exactly one Back should close it
+    await expect(overlay).not.toHaveClass(/is-open/);
+    await expect(page).toHaveURL(/index\.html$/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 3. Mobile behaviour: links navigate directly instead of opening the modal.
+// ---------------------------------------------------------------------------
+test.describe("mobile viewport", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("link navigates directly (no lightbox modal)", async ({ page }) => {
+    await page.goto("/index.html");
+    const widget = page.locator(".lbg").nth(2); // masonry, toggle off
+    const link = widget.locator(".lbg__masonry .lbg__link").first();
+    const href = await link.getAttribute("href");
+    expect(href).toMatch(/pages\/page-\d+\.html/);
+
+    await link.click();
+    await page.waitForURL(/pages\/page-\d+\.html$/);
+    // No modal overlay was created.
+    await expect(page.locator(".lbg-lightbox.is-open")).toHaveCount(0);
+  });
 });

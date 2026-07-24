@@ -59,18 +59,22 @@ Rules:
 
 ## Configuration (data-attributes on the outer `<ul>`)
 
-| Attribute     | Purpose                                                             | Default            |
-| ------------- | ------------------------------------------------------------------- | ------------------ |
-| `rel`         | Activation flag (token `lightbox-grid`)                             | required           |
-| `data-mode`   | Initial display mode: `carousel` or `masonry`                       | `carousel`         |
-| `data-timer`  | Carousel autoplay interval in milliseconds                          | autoplay **off**   |
-| `data-toggle` | `off` / `disabled` / `false` / `none` hides the mode-toggle UI      | toggle **enabled** |
+| Attribute               | Purpose                                                        | Default            |
+| ----------------------- | -------------------------------------------------------------- | ------------------ |
+| `rel`                   | Activation flag (token `lightbox-grid`)                        | required           |
+| `data-mode`             | Initial display mode: `carousel` or `masonry`                  | `carousel`         |
+| `data-timer`            | Carousel autoplay interval in milliseconds                     | autoplay **off**   |
+| `data-toggle`           | `off` / `disabled` / `false` / `none` hides the mode-toggle UI | toggle **enabled** |
+| `data-mobile-breakpoint`| Viewport width (px) at/below which links navigate directly     | `640`              |
 
 - **`data-timer`**: autoplay is enabled **only** when a positive `data-timer` is
   present. When the attribute is absent (or non-positive), the carousel does not
   autoplay and is arrows/dots/keyboard only.
 - **`data-toggle`**: when disabled, the widget is locked to `data-mode` and no
   toggle control is rendered.
+- **`data-mobile-breakpoint`**: controls the [mobile behavior](#mobile-behavior)
+  threshold. Evaluated at click time, so resize / orientation changes are
+  handled without reload.
 
 ## Display Modes
 
@@ -122,8 +126,15 @@ When an item's link is activated:
        (`[role="navigation"]`, `[role="banner"]`, `[role="contentinfo"]`).
    - (The original spec's "nsv" is read as a typo for the **nav** section.)
 4. The overlay provides a close affordance (button, `Esc` key, and backdrop
-   click), returns focus to the triggering link on close, and should trap focus
-   while open for accessibility.
+   click), returns focus to the triggering link on close, and traps focus while
+   open for accessibility.
+
+### History / back-button integration
+
+Opening the lightbox pushes a history entry, so the browser/hardware **back**
+button (and Android gesture back) closes the overlay instead of navigating away
+from the page. Closing via button/`Esc`/backdrop unwinds that entry so the URL
+and history are left clean.
 
 ### Same-origin only
 
@@ -131,6 +142,29 @@ When an item's link is activated:
 - **This widget assumes same-origin targets.** Cross-origin fallback handling is
   out of scope; behavior with cross-origin URLs is undefined (browser will block
   the CSS injection). This should be documented for consumers of the widget.
+
+## Mobile Behavior
+
+On narrow viewports (width at or below `data-mobile-breakpoint`, default `640px`)
+the widget **does not open the modal lightbox** — instead the item link navigates
+directly to the target page, using the browser's native full-page view.
+
+Rationale and trade-offs:
+
+- **Why direct navigation on mobile:** the floating modal is a poor fit on
+  phones — the backdrop-to-close target shrinks to a thin ring, there is no `Esc`
+  key, nested iframe scrolling is janky, and a fixed-height dialog fights the
+  mobile URL-bar viewport resizing. Native navigation gives correct back-button,
+  scroll, and pinch-zoom behavior for free.
+- **Known trade-off:** direct navigation shows the target page's **full chrome**
+  (its own nav/header/footer) because the content-stripping CSS is only injected
+  into the same-origin iframe. Where content-stripping on mobile matters, the
+  target pages should be presentable standalone, or the breakpoint lowered.
+- **Detection:** a `matchMedia("(max-width: <bp>px)")` check evaluated **at click
+  time** (falling back to `window.innerWidth`), so rotating a device or resizing
+  a window switches behavior with no reload and no user-agent sniffing.
+- **Preserved intents:** modifier-clicks (⌘/Ctrl/Shift/Alt, middle-click) are
+  never intercepted on any viewport, so open-in-new-tab/window always works.
 
 ## Styling
 
@@ -161,6 +195,10 @@ Previously-open questions, now settled and reflected in the implementation:
 - **Loading strategy** — same-origin `<iframe>` with injected CSS (cross-origin
   is out of scope).
 - **Mode toggle** — rendered by default; suppressible via `data-toggle="off"`.
+- **Mobile** — links navigate directly (no modal) at/below
+  `data-mobile-breakpoint` (default `640px`); see [Mobile Behavior](#mobile-behavior).
+- **Back button** — opening the lightbox pushes a history entry so back closes
+  the overlay instead of leaving the page.
 
 ## Repository Layout
 
