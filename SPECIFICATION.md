@@ -66,6 +66,7 @@ Rules:
 | `data-timer`            | Carousel autoplay interval in milliseconds                     | autoplay **off**   |
 | `data-toggle`           | `off` / `disabled` / `false` / `none` hides the mode-toggle UI | toggle **enabled** |
 | `data-mobile-breakpoint`| Viewport width (px) at/below which links navigate directly     | `640`              |
+| `data-mobile-mode`      | Initial view on mobile: `carousel` or `masonry`                | `carousel`         |
 
 - **`data-timer`**: autoplay is enabled **only** when a positive `data-timer` is
   present. When the attribute is absent (or non-positive), the carousel does not
@@ -75,6 +76,10 @@ Rules:
 - **`data-mobile-breakpoint`**: controls the [mobile behavior](#mobile-behavior)
   threshold. Evaluated at click time, so resize / orientation changes are
   handled without reload.
+- **`data-mobile-mode`**: the initial view when the viewport is mobile-sized.
+  Defaults to `carousel` because a full masonry grid is awkward on phones; set it
+  to `masonry` to override. On desktop, `data-mode` is used instead. The active
+  view recomputes on resize until the visitor picks one with the toggle.
 
 ## Display Modes
 
@@ -101,6 +106,11 @@ runtime via a **toggle UI element** the widget renders.
     and positive. It is also suppressed when `prefers-reduced-motion` is set.
 - Keyboard accessible: arrow keys navigate; controls are focusable with ARIA
   labels.
+- **Touch swipe:** on touch devices the track follows the finger and snaps to
+  the nearest slide; a horizontal swipe past a small threshold changes slide
+  (and suppresses the trailing click so the item link does not also fire), while
+  a vertical drag is left alone so the page can still scroll. Swiping stops
+  autoplay, like any other manual navigation.
 
 ### Masonry Grid
 
@@ -149,6 +159,17 @@ On narrow viewports (width at or below `data-mobile-breakpoint`, default `640px`
 the widget **does not open the modal lightbox** — instead the item link navigates
 directly to the target page, using the browser's native full-page view.
 
+The widget also **defaults to the carousel view on mobile**, even when
+`data-mode="masonry"`, because a full masonry grid of tiles is awkward on a
+phone; authors can override this with `data-mobile-mode="masonry"`. The active
+view recomputes whenever the viewport crosses the breakpoint (resize or
+rotation) — until the visitor explicitly picks a view with the toggle, after
+which the widget stops auto-switching and respects their choice.
+
+The **mode-toggle UI is hidden on mobile** (the view is locked to the carousel
+there), and reappears on desktop viewports. This is independent of
+`data-toggle`, which removes the toggle entirely on all viewports.
+
 Rationale and trade-offs:
 
 - **Why direct navigation on mobile:** the floating modal is a poor fit on
@@ -196,7 +217,9 @@ Previously-open questions, now settled and reflected in the implementation:
   is out of scope).
 - **Mode toggle** — rendered by default; suppressible via `data-toggle="off"`.
 - **Mobile** — links navigate directly (no modal) at/below
-  `data-mobile-breakpoint` (default `640px`); see [Mobile Behavior](#mobile-behavior).
+  `data-mobile-breakpoint` (default `640px`), and the view defaults to carousel
+  (override with `data-mobile-mode`); see [Mobile Behavior](#mobile-behavior).
+- **Touch** — the carousel supports finger-swipe navigation with snap.
 - **Back button** — opening the lightbox pushes a history entry so back closes
   the overlay instead of leaving the page.
 

@@ -49,6 +49,37 @@ test.describe("demo page", () => {
     expect(t0).toContain("translateX(0%)");
   });
 
+  test("carousel supports touch swipe navigation", async ({ page }) => {
+    const widget = page.locator(".lbg").first();
+    const viewport = widget.locator(".lbg__viewport");
+    await expect(widget.locator(".lbg__dot").nth(0)).toHaveClass(/is-active/);
+
+    // Dispatch a synthetic horizontal swipe: fromX -> toX.
+    const swipe = (fromX, toX) =>
+      viewport.evaluate(
+        (vp, [a, b]) => {
+          const tev = (type, x) => {
+            const ev = new Event(type, { bubbles: true, cancelable: true });
+            const pt = { clientX: x, clientY: 150 };
+            ev.touches = type === "touchend" ? [] : [pt];
+            ev.changedTouches = [pt];
+            vp.dispatchEvent(ev);
+          };
+          tev("touchstart", a);
+          tev("touchmove", a + (b < a ? -10 : 10));
+          tev("touchmove", b);
+          tev("touchend", b);
+        },
+        [fromX, toX]
+      );
+
+    await swipe(320, 60); // swipe left -> next slide
+    await expect(widget.locator(".lbg__dot").nth(1)).toHaveClass(/is-active/);
+
+    await swipe(60, 330); // swipe right -> previous slide
+    await expect(widget.locator(".lbg__dot").nth(0)).toHaveClass(/is-active/);
+  });
+
   test("mode toggle switches carousel <-> masonry", async ({ page }) => {
     const widget = page.locator(".lbg").first();
     await expect(widget).toHaveClass(/lbg--carousel/);
@@ -187,8 +218,9 @@ test.describe("mobile viewport", () => {
 
   test("link navigates directly (no lightbox modal)", async ({ page }) => {
     await page.goto("/index.html");
-    const widget = page.locator(".lbg").nth(2); // masonry, toggle off
-    const link = widget.locator(".lbg__masonry .lbg__link").first();
+    const widget = page.locator(".lbg").nth(2);
+    // On mobile the widget shows the carousel, so click a visible carousel link.
+    const link = widget.locator(".lbg__carousel .lbg__link").first();
     const href = await link.getAttribute("href");
     expect(href).toMatch(/pages\/page-\d+\.html/);
 
@@ -196,5 +228,38 @@ test.describe("mobile viewport", () => {
     await page.waitForURL(/pages\/page-\d+\.html$/);
     // No modal overlay was created.
     await expect(page.locator(".lbg-lightbox.is-open")).toHaveCount(0);
+  });
+
+  test("defaults to carousel on mobile even when data-mode is masonry", async ({ page }) => {
+    await page.goto("/index.html");
+    // Demo 2 and 3 declare data-mode="masonry" but have no data-mobile-mode.
+    await expect(page.locator(".lbg").nth(1)).toHaveClass(/lbg--carousel/);
+    await expect(page.locator(".lbg").nth(2)).toHaveClass(/lbg--carousel/);
+  });
+
+  test("mode toggle is suppressed on mobile", async ({ page }) => {
+    await page.goto("/index.html");
+    // Demo 1 and 2 have the toggle enabled; it must be hidden on mobile.
+    await expect(page.locator(".lbg").nth(0).locator(".lbg__modes")).toBeHidden();
+    await expect(page.locator(".lbg").nth(1).locator(".lbg__modes")).toBeHidden();
+  });
+
+  test("data-mobile-mode overrides the mobile default", async ({ page }) => {
+    await page.goto("/index.html");
+    await page.evaluate(() => {
+      const ul = document.createElement("ul");
+      ul.id = "override-fixture";
+      ul.setAttribute("rel", "lightbox-grid");
+      ul.setAttribute("data-mode", "carousel");
+      ul.setAttribute("data-mobile-mode", "masonry");
+      ul.innerHTML =
+        '<li><ul><li><img src="images/img1.svg" width="400" height="300" alt="a"></li>' +
+        '<li><a href="/pages/page-1.html">A</a></li></ul></li>' +
+        '<li><ul><li><img src="images/img2.svg" width="400" height="520" alt="b"></li>' +
+        '<li><a href="/pages/page-2.html">B</a></li></ul></li>';
+      document.querySelector(".page").appendChild(ul);
+      window.LightboxGrid.init();
+    });
+    await expect(page.locator("#override-fixture + .lbg")).toHaveClass(/lbg--masonry/);
   });
 });

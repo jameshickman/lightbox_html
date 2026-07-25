@@ -8,12 +8,13 @@ page in a **lightbox overlay** that shows only the page's main content.
 - **Broad browser support** — ES5-style code, no `<dialog>`, feature-detected.
 - **Progressive enhancement** — enhances plain, valid list markup; links still
   work with JavaScript disabled.
-- **Two views** — carousel (arrows, dots, keyboard, pausable autoplay) and a
-  best-fit masonry grid, with an optional toggle between them.
+- **Two views** — carousel (arrows, dots, keyboard, touch-swipe, pausable
+  autoplay) and a best-fit masonry grid, with an optional toggle between them.
 - **Same-origin lightbox** — loads the target page in an iframe and hides its
   nav/header/footer, keeping only the semantic content region.
 - **Mobile-aware** — on narrow screens, links navigate directly instead of
-  opening the modal.
+  opening the modal, and the view defaults to the carousel (masonry tiles are
+  awkward on phones); both are configurable.
 - **Back-button friendly** — opening the lightbox pushes a history entry, so the
   browser/hardware Back button closes it.
 - **Themeable** — BEM classes driven by CSS custom properties; dark theme by
@@ -69,6 +70,7 @@ Set these as attributes on the outer `<ul>`:
 | `data-timer`             | Carousel autoplay interval in milliseconds                     | autoplay **off**   |
 | `data-toggle`            | `off` / `disabled` / `false` / `none` hides the mode toggle    | toggle **enabled** |
 | `data-mobile-breakpoint` | Viewport width (px) at/below which links navigate directly     | `640`              |
+| `data-mobile-mode`       | Initial view on mobile: `carousel` or `masonry`                | `carousel`         |
 
 - **`data-timer`** — autoplay runs only when a positive value is present.
   Autoplay pauses on hover/focus, stops on manual navigation, and is suppressed
@@ -81,7 +83,8 @@ Set these as attributes on the outer `<ul>`:
 
 ### Carousel
 One slide at a time with previous/next arrows, dot indicators, arrow-key
-navigation, and wrap-around. Optional autoplay via `data-timer`.
+navigation, touch-swipe (drag-to-follow with snap), and wrap-around. Optional
+autoplay via `data-timer`.
 
 ### Masonry
 Best-fit columns computed from each image's intrinsic aspect ratio (items are
@@ -110,6 +113,12 @@ On viewports at or below `data-mobile-breakpoint` (default `640px`), item links
 **navigate directly** instead of opening the modal — a better fit for phones
 (native back button, scroll, and pinch-zoom). Modifier-clicks and middle-clicks
 (open in new tab/window) are never intercepted on any viewport.
+
+Mobile also **defaults to the carousel view** (a full masonry grid is awkward on
+phones), overridable with `data-mobile-mode="masonry"`, and **hides the mode
+toggle** (the view is locked to the carousel there). The active view recomputes
+as the viewport crosses the breakpoint — until the visitor picks one with the
+toggle, after which their choice is respected.
 
 ## Theming
 

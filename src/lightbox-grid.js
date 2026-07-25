@@ -29,7 +29,23 @@
   var MASONRY_MIN_COL = 220; /* px: target minimum column width */
   var DEFAULT_TIMER = 5000; /* used only when data-timer is a bare/invalid value */
   var DEFAULT_MOBILE_BP = 640; /* px: at/below this width, links navigate directly */
+  var SWIPE_MIN = 40; /* px: minimum horizontal travel to count as a swipe */
   var idCounter = 0;
+
+  // Feature-detect passive event listeners so touchmove can call preventDefault
+  // where supported without tripping old browsers that lack the options object.
+  var SUPPORTS_PASSIVE = false;
+  try {
+    var _passiveProbe = Object.defineProperty({}, "passive", {
+      get: function () {
+        SUPPORTS_PASSIVE = true;
+      }
+    });
+    window.addEventListener("lbg-passive-probe", null, _passiveProbe);
+    window.removeEventListener("lbg-passive-probe", null, _passiveProbe);
+  } catch (e) {
+    SUPPORTS_PASSIVE = false;
+  }
 
   /* ---- small helpers ---------------------------------------------------- */
 
@@ -338,9 +354,29 @@
   function Widget(sourceUl) {
     this.source = sourceUl;
     this.items = parseItems(sourceUl);
-    this.mode = sourceUl.getAttribute("data-mode") === "masonry"
-      ? "masonry"
-      : "carousel";
+
+    // Desktop initial view (data-mode). On mobile the default is carousel — a
+    // full masonry grid is awkward on phones — unless data-mobile-mode overrides
+    // it. The active view still recomputes on resize until the user toggles.
+    this.desktopMode =
+      sourceUl.getAttribute("data-mode") === "masonry" ? "masonry" : "carousel";
+    var mobileModeAttr = (
+      sourceUl.getAttribute("data-mobile-mode") || ""
+    ).toLowerCase();
+    this.mobileMode =
+      mobileModeAttr === "masonry" || mobileModeAttr === "carousel"
+        ? mobileModeAttr
+        : "carousel";
+    this.userChoseMode = false;
+
+    // On narrow (mobile) viewports, links navigate directly instead of opening
+    // the modal lightbox. The threshold is configurable per widget.
+    this.mobileBreakpoint = toInt(
+      sourceUl.getAttribute("data-mobile-breakpoint"),
+      DEFAULT_MOBILE_BP
+    );
+
+    this.mode = this.isMobile() ? this.mobileMode : this.desktopMode;
 
     var timerAttr = sourceUl.getAttribute("data-timer");
     // Autoplay is enabled only when a positive data-timer is provided.
@@ -360,13 +396,6 @@
       toggleAttr === "none"
     );
 
-    // On narrow (mobile) viewports, links navigate directly instead of opening
-    // the modal lightbox. The threshold is configurable per widget.
-    this.mobileBreakpoint = toInt(
-      sourceUl.getAttribute("data-mobile-breakpoint"),
-      DEFAULT_MOBILE_BP
-    );
-
     this.current = 0;
     this.autoplayId = null;
     this.hoverPaused = false;
@@ -384,7 +413,9 @@
     root.id = this.id;
     this.root = root;
 
-    // ---- Toolbar / mode toggle (omitted when disabled via data-toggle)
+    // ---- Toolbar / mode toggle (omitted when disabled via data-toggle,
+    // and hidden on mobile where the view is locked to the carousel).
+    this.toolbar = null;
     if (this.toggleEnabled) {
       var toolbar = el("div", "lbg__toolbar");
       var modes = el("div", "lbg__modes");
@@ -397,6 +428,7 @@
       modes.appendChild(this.masonryBtn);
       toolbar.appendChild(modes);
       root.appendChild(toolbar);
+      this.toolbar = toolbar;
     }
 
     var stage = el("div", "lbg__stage");
@@ -412,6 +444,13 @@
     // On mobile viewports, do NOT intercept: let the link navigate directly.
     // Modifier-clicks (new tab/window) are always left to the browser.
     root.addEventListener("click", function (e) {
+      // Swallow the click synthesized after a swipe (would follow the link).
+      if (self._suppressClick) {
+        self._suppressClick = false;
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       var link = closestLink(e.target, root);
       if (!link) return;
       if (self.isMobile()) return; /* direct navigation on mobile */
@@ -423,16 +462,33 @@
     });
 
     this.updateModeUI();
+    this.updateToolbarVisibility();
     if (this.mode === "masonry") {
       this.layoutMasonry();
     }
     this.startAutoplay();
 
-    // Relayout masonry on resize.
+    // On resize: hide/show the toggle for the viewport, and — until the user
+    // picks a view themselves — keep the mode in sync (carousel on mobile,
+    // data-mode on desktop). Always relayout masonry when it is the active view.
     this.onResize = debounce(function () {
+      self.updateToolbarVisibility();
+      if (!self.userChoseMode) {
+        var want = self.isMobile() ? self.mobileMode : self.desktopMode;
+        if (want !== self.mode) {
+          self.setMode(want, false); /* setMode relayouts masonry as needed */
+          return;
+        }
+      }
       if (self.mode === "masonry") self.layoutMasonry();
     }, 120);
     window.addEventListener("resize", this.onResize);
+  };
+
+  // The mode toggle is hidden on mobile (the view is locked to the carousel).
+  Widget.prototype.updateToolbarVisibility = function () {
+    if (!this.toolbar) return;
+    this.toolbar.style.display = this.isMobile() ? "none" : "";
   };
 
   function closestLink(node, boundary) {
@@ -451,7 +507,7 @@
     btn.setAttribute("type", "button");
     btn.appendChild(document.createTextNode(label));
     btn.onclick = function () {
-      self.setMode(mode);
+      self.setMode(mode, true); /* explicit user choice: stop auto-switching */
     };
     return btn;
   };
@@ -541,6 +597,10 @@
       dots.appendChild(dot);
       this.dots.push(dot);
     }
+    // Reflect the initial slide (go() only updates dots on navigation).
+    if (this.dots.length) {
+      this.dots[this.current].className = "lbg__dot is-active";
+    }
     carousel.appendChild(dots);
 
     // Keyboard navigation within the carousel.
@@ -567,8 +627,97 @@
       self.hoverPaused = false;
     });
 
+    // Touch swipe navigation: follow the finger, then snap to the nearest slide.
+    // A horizontal drag past the threshold changes slide (and suppresses the
+    // trailing click so the item link doesn't also fire); a vertical drag is
+    // left alone so the page can scroll; a near-stationary touch is a tap.
+    var touch = {
+      active: false,
+      decided: false,
+      horizontal: false,
+      x0: 0,
+      y0: 0,
+      dx: 0,
+      w: 1
+    };
+
+    viewport.addEventListener(
+      "touchstart",
+      function (e) {
+        if (!e.touches || e.touches.length !== 1) return;
+        touch.active = true;
+        touch.decided = false;
+        touch.horizontal = false;
+        touch.x0 = e.touches[0].clientX;
+        touch.y0 = e.touches[0].clientY;
+        touch.dx = 0;
+        touch.w = viewport.clientWidth || 1;
+        track.style.transition = "none"; /* follow the finger 1:1 */
+      },
+      SUPPORTS_PASSIVE ? { passive: true } : false
+    );
+
+    viewport.addEventListener(
+      "touchmove",
+      function (e) {
+        if (!touch.active || !e.touches || e.touches.length !== 1) return;
+        var dx = e.touches[0].clientX - touch.x0;
+        var dy = e.touches[0].clientY - touch.y0;
+        if (!touch.decided) {
+          if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return; /* wait for intent */
+          touch.decided = true;
+          touch.horizontal = Math.abs(dx) > Math.abs(dy);
+          if (!touch.horizontal) {
+            // Vertical scroll: bail out and restore the CSS transition.
+            touch.active = false;
+            track.style.transition = "";
+            return;
+          }
+        }
+        if (!touch.horizontal) return;
+        if (e.cancelable) e.preventDefault(); /* stop the page scrolling sideways */
+        touch.dx = dx;
+        var pct = -(self.current * 100) + (dx / touch.w) * 100;
+        track.style.transform = "translateX(" + pct + "%)";
+      },
+      SUPPORTS_PASSIVE ? { passive: false } : false
+    );
+
+    function endTouch() {
+      if (!touch.active) return;
+      touch.active = false;
+      track.style.transition = ""; /* re-enable the snap animation */
+      if (!touch.horizontal) return;
+
+      if (touch.dx <= -SWIPE_MIN) {
+        self.go(self.current + 1, true);
+        self.suppressNextClick();
+      } else if (touch.dx >= SWIPE_MIN) {
+        self.go(self.current - 1, true);
+        self.suppressNextClick();
+      } else {
+        self.go(self.current, false); /* snap back to the current slide */
+        if (Math.abs(touch.dx) > 6) self.suppressNextClick();
+      }
+    }
+
+    viewport.addEventListener("touchend", endTouch);
+    viewport.addEventListener("touchcancel", endTouch);
+
     this.carousel = carousel;
     return carousel;
+  };
+
+  // After a swipe, suppress the click the browser synthesizes from the touch so
+  // the item link/lightbox doesn't also activate. Cleared on the next click, or
+  // after a short timeout if no click follows.
+  Widget.prototype.suppressNextClick = function () {
+    var self = this;
+    this._suppressClick = true;
+    if (this._suppressTimer) window.clearTimeout(this._suppressTimer);
+    this._suppressTimer = window.setTimeout(function () {
+      self._suppressClick = false;
+    }, 500);
   };
 
   Widget.prototype.go = function (index, manual) {
@@ -684,8 +833,9 @@
 
   /* ---- Mode switching --------------------------------------------------- */
 
-  Widget.prototype.setMode = function (mode) {
+  Widget.prototype.setMode = function (mode, userInitiated) {
     if (mode !== "carousel" && mode !== "masonry") return;
+    if (userInitiated) this.userChoseMode = true;
     if (mode === this.mode) return;
     this.mode = mode;
     this.updateModeUI();

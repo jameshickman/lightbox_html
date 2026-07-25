@@ -97,6 +97,25 @@
       return n;
     }
 
+    // Simulate a horizontal (and optional vertical) touch swipe on an element
+    // by dispatching touchstart/touchmove/touchend with synthetic touch points.
+    function swipe(el, startX, dx, dy) {
+      dy = dy || 0;
+      function tev(type, x, y) {
+        var ev;
+        try { ev = new Event(type, { bubbles: true, cancelable: true }); }
+        catch (e) { ev = document.createEvent("Event"); ev.initEvent(type, true, true); }
+        var pt = { clientX: x, clientY: y };
+        ev.touches = type === "touchend" ? [] : [pt];
+        ev.changedTouches = [pt];
+        el.dispatchEvent(ev);
+      }
+      tev("touchstart", startX, 200);
+      tev("touchmove", startX + Math.sign(dx || 1) * 10, 200 + Math.sign(dy) * 2);
+      tev("touchmove", startX + dx, 200 + dy);
+      tev("touchend", startX + dx, 200 + dy);
+    }
+
     function run() {
       var fA = document.getElementById("fixtureA");
       var fB = document.getElementById("fixtureB");
@@ -127,6 +146,17 @@
       // --- Track transform reflects current slide
       var transform = wA.querySelector(".lbg__track").style.transform;
       assert(/translateX\(/.test(transform), "Track uses translateX transform: " + transform);
+
+      // --- Touch swipe navigation
+      instA.go(1, false); // start on slide 1
+      var viewport = wA.querySelector(".lbg__viewport");
+      swipe(viewport, 300, -200);   // swipe LEFT -> next
+      eq(instA.current, 2, "Swipe left advances to next slide");
+      swipe(viewport, 100, 260);    // swipe RIGHT -> prev
+      eq(instA.current, 1, "Swipe right returns to previous slide");
+      swipe(viewport, 200, -5);     // tiny move -> treated as a tap, no change
+      eq(instA.current, 1, "Small horizontal move does not change slide");
+      instA._suppressClick = false; // reset for later lightbox test
 
       // --- Mode switching
       var beforeBtn = wA.querySelector(".lbg__mode-btn");
