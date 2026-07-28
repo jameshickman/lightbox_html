@@ -1,47 +1,38 @@
 /* ==========================================================================
-   lightbox-grid.css
-   Styling for the Carousel / Masonry grid lightbox widget.
+   lightbox-grid-light.css  —  LIGHT theme build
+   Self-contained stylesheet for the Carousel / Masonry / Rows lightbox widget.
+
+   Deployment: link EITHER this file OR lightbox-grid-dark.css — never both.
+   Each file bundles the full widget structure plus one palette baked into the
+   `.lbg` theme tokens below. To retheme, either edit the tokens here or copy
+   this file and swap the palette.
 
    - BEM naming under the `lbg` block so styles do not leak into the host page.
-   - CSS Custom Properties are the primary customization surface: override the
-     variables on `.lbg` (or :root) to re-theme without touching the JS.
-   - Default theme is DARK. A `.lbg--light` modifier is provided as an example
-     of theming via variable overrides.
+   - CSS Custom Properties are the customization surface: override the variables
+     on `.lbg` to re-theme without touching the JS.
    ========================================================================== */
 
-/* ---- Theme tokens (customization surface) -------------------------------- */
+/* ---- Theme tokens (LIGHT) — the only part that differs from the dark build - */
 .lbg {
-  --lbg-bg: #14161a;
-  --lbg-surface: #1e2228;
-  --lbg-surface-2: #262b33;
-  --lbg-text: #e8eaed;
-  --lbg-muted: #9aa3ad;
-  --lbg-accent: #6ea8fe;
-  --lbg-accent-contrast: #0b1220;
-  --lbg-border: #333a44;
-  --lbg-gap: 16px;
-  --lbg-radius: 10px;
-  --lbg-transition: 240ms;
-  --lbg-carousel-height: 420px;
-  --lbg-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
-
-  /* Lightbox overlay tokens */
-  --lbg-overlay-bg: rgba(6, 8, 12, 0.78);
-  --lbg-dialog-bg: #ffffff;
-  --lbg-dialog-max-w: 960px;
-}
-
-/* Example alternate theme via variable overrides only. */
-.lbg--light {
   --lbg-bg: #f5f6f8;
   --lbg-surface: #ffffff;
   --lbg-surface-2: #eef1f5;
   --lbg-text: #1b1f24;
   --lbg-muted: #5b636d;
-  --lbg-accent: #2f6fed;
-  --lbg-accent-contrast: #ffffff;
+  --lbg-accent: #e48521; /* navigation highlights: active mode/dots, focus */
+  --lbg-accent-contrast: #1b1f24; /* dark text stays legible on the orange */
   --lbg-border: #d7dce2;
+  --lbg-gap: 16px;
+  --lbg-row-height: 240px; /* target row height for the justified grid */
+  --lbg-radius: 10px;
+  --lbg-transition: 240ms;
+  --lbg-carousel-height: 420px;
   --lbg-shadow: 0 6px 24px rgba(20, 30, 50, 0.15);
+
+  /* Lightbox overlay tokens */
+  --lbg-overlay-bg: rgba(20, 28, 44, 0.55);
+  --lbg-dialog-bg: #ffffff;
+  --lbg-dialog-max-w: 960px;
 }
 
 /* ---- Root block ---------------------------------------------------------- */
@@ -109,7 +100,7 @@
 
 /* ---- Stage: only the active mode is shown ------------------------------- */
 .lbg__carousel,
-.lbg__masonry {
+.lbg__grid {
   display: none;
 }
 
@@ -117,7 +108,8 @@
   display: block;
 }
 
-.lbg--masonry .lbg__masonry {
+.lbg--masonry .lbg__masonry,
+.lbg--rows .lbg__rows {
   display: block;
 }
 
@@ -247,14 +239,18 @@
 }
 
 /* ==========================================================================
-   Masonry
+   Grid modes — shared styling for the two JS-positioned grids:
+     .lbg__masonry  = classic uniform-width columns, shortest-column packing.
+     .lbg__rows     = justified "expanding rows" (photo-platform style): each
+                      row shares one height and images keep their aspect ratio.
+   Both absolutely position their .lbg__item cells; JS sets the geometry.
    ========================================================================== */
-.lbg__masonry {
+.lbg__grid {
   position: relative;
   width: 100%;
 }
 
-.lbg__masonry .lbg__item {
+.lbg__grid .lbg__item {
   position: absolute;
   top: 0;
   left: 0;
@@ -266,24 +262,24 @@
     left var(--lbg-transition) ease, top var(--lbg-transition) ease;
 }
 
-.lbg__masonry .lbg__item:hover {
+.lbg__grid .lbg__item:hover {
   transform: translateY(-3px);
 }
 
-.lbg__masonry .lbg__media {
+.lbg__grid .lbg__media {
   display: block;
   width: 100%;
   background: var(--lbg-surface-2);
   /* height set inline by JS from the image's intrinsic dimensions */
 }
 
-.lbg__masonry .lbg__link:focus-visible {
+.lbg__grid .lbg__link:focus-visible {
   outline: 2px solid var(--lbg-accent);
   outline-offset: -2px;
 }
 
 /* Before JS lays it out, keep a graceful fallback flow. */
-.lbg__masonry.is-unlaid .lbg__item {
+.lbg__grid.is-unlaid .lbg__item {
   position: static;
   display: inline-block;
   width: 240px;
@@ -319,7 +315,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--lbg-overlay-bg, rgba(6, 8, 12, 0.78));
+  background: var(--lbg-overlay-bg, rgba(20, 28, 44, 0.55));
 }
 
 .lbg-lightbox__dialog {
@@ -331,7 +327,7 @@
   background: var(--lbg-dialog-bg, #fff);
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 12px 48px rgba(20, 30, 50, 0.25);
   display: flex;
   flex-direction: column;
 }
@@ -357,7 +353,7 @@
 }
 
 .lbg-lightbox__close:focus-visible {
-  outline: 2px solid #6ea8fe;
+  outline: 2px solid var(--lbg-accent);
   outline-offset: 2px;
 }
 
@@ -397,7 +393,7 @@
    ========================================================================== */
 @media (prefers-reduced-motion: reduce) {
   .lbg__track,
-  .lbg__masonry .lbg__item,
+  .lbg__grid .lbg__item,
   .lbg__nav,
   .lbg__mode-btn {
     transition: none !important;

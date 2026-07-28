@@ -1,0 +1,401 @@
+/* ==========================================================================
+   lightbox-grid-dark.css  —  DARK theme build
+   Self-contained stylesheet for the Carousel / Masonry / Rows lightbox widget.
+
+   Deployment: link EITHER this file OR lightbox-grid-light.css — never both.
+   Each file bundles the full widget structure plus one palette baked into the
+   `.lbg` theme tokens below. To retheme, either edit the tokens here or copy
+   this file and swap the palette.
+
+   - BEM naming under the `lbg` block so styles do not leak into the host page.
+   - CSS Custom Properties are the customization surface: override the variables
+     on `.lbg` to re-theme without touching the JS.
+   ========================================================================== */
+
+/* ---- Theme tokens (DARK) — the only part that differs from the light build - */
+.lbg {
+  --lbg-bg: #14161a;
+  --lbg-surface: #1e2228;
+  --lbg-surface-2: #262b33;
+  --lbg-text: #e8eaed;
+  --lbg-muted: #9aa3ad;
+  --lbg-accent: #6ea8fe;
+  --lbg-accent-contrast: #0b1220;
+  --lbg-border: #333a44;
+  --lbg-gap: 16px;
+  --lbg-row-height: 240px; /* target row height for the justified grid */
+  --lbg-radius: 10px;
+  --lbg-transition: 240ms;
+  --lbg-carousel-height: 420px;
+  --lbg-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+
+  /* Lightbox overlay tokens */
+  --lbg-overlay-bg: rgba(6, 8, 12, 0.78);
+  --lbg-dialog-bg: #ffffff;
+  --lbg-dialog-max-w: 960px;
+}
+
+/* ---- Root block ---------------------------------------------------------- */
+.lbg {
+  box-sizing: border-box;
+  color: var(--lbg-text);
+  background: var(--lbg-bg);
+  padding: var(--lbg-gap);
+  border-radius: var(--lbg-radius);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  line-height: 1.4;
+}
+
+.lbg *,
+.lbg *::before,
+.lbg *::after {
+  box-sizing: inherit;
+}
+
+/* Hide the original source list once the widget has enhanced it. */
+.lbg-source--enhanced {
+  display: none !important;
+}
+
+/* ---- Toolbar / mode toggle ---------------------------------------------- */
+.lbg__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--lbg-gap);
+}
+
+.lbg__modes {
+  display: inline-flex;
+  border: 1px solid var(--lbg-border);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--lbg-surface);
+}
+
+.lbg__mode-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--lbg-muted);
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background var(--lbg-transition), color var(--lbg-transition);
+}
+
+.lbg__mode-btn:hover {
+  color: var(--lbg-text);
+}
+
+.lbg__mode-btn.is-active {
+  background: var(--lbg-accent);
+  color: var(--lbg-accent-contrast);
+}
+
+.lbg__mode-btn:focus-visible {
+  outline: 2px solid var(--lbg-accent);
+  outline-offset: -2px;
+}
+
+/* ---- Stage: only the active mode is shown ------------------------------- */
+.lbg__carousel,
+.lbg__grid {
+  display: none;
+}
+
+.lbg--carousel .lbg__carousel {
+  display: block;
+}
+
+.lbg--masonry .lbg__masonry,
+.lbg--rows .lbg__rows {
+  display: block;
+}
+
+/* ---- Shared item pieces -------------------------------------------------- */
+.lbg__link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  height: 100%;
+}
+
+.lbg__caption {
+  display: block;
+  padding: 10px 12px;
+  font-size: 0.95rem;
+  color: var(--lbg-text);
+}
+
+.lbg__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ==========================================================================
+   Carousel
+   ========================================================================== */
+.lbg__carousel {
+  position: relative;
+}
+
+.lbg__viewport {
+  overflow: hidden;
+  border-radius: var(--lbg-radius);
+}
+
+.lbg__track {
+  display: flex;
+  transition: transform var(--lbg-transition) ease;
+  will-change: transform;
+}
+
+.lbg__slide {
+  flex: 0 0 100%;
+  min-width: 100%;
+}
+
+.lbg__slide .lbg__link {
+  background: var(--lbg-surface);
+  border-radius: var(--lbg-radius);
+  overflow: hidden;
+}
+
+.lbg__slide .lbg__media {
+  display: block;
+  width: 100%;
+  height: var(--lbg-carousel-height);
+  background: var(--lbg-surface-2);
+}
+
+/* Navigation arrows */
+.lbg__nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--lbg-border);
+  background: var(--lbg-surface);
+  color: var(--lbg-text);
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--lbg-shadow);
+  transition: background var(--lbg-transition), transform var(--lbg-transition);
+}
+
+.lbg__nav:hover {
+  background: var(--lbg-surface-2);
+}
+
+.lbg__nav:focus-visible {
+  outline: 2px solid var(--lbg-accent);
+  outline-offset: 2px;
+}
+
+.lbg__nav--prev {
+  left: 10px;
+}
+
+.lbg__nav--next {
+  right: 10px;
+}
+
+/* Dots / indicators */
+.lbg__dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: var(--lbg-gap);
+}
+
+.lbg__dot {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--lbg-border);
+  background: var(--lbg-surface-2);
+  cursor: pointer;
+}
+
+.lbg__dot.is-active {
+  background: var(--lbg-accent);
+  border-color: var(--lbg-accent);
+}
+
+.lbg__dot:focus-visible {
+  outline: 2px solid var(--lbg-accent);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Grid modes — shared styling for the two JS-positioned grids:
+     .lbg__masonry  = classic uniform-width columns, shortest-column packing.
+     .lbg__rows     = justified "expanding rows" (photo-platform style): each
+                      row shares one height and images keep their aspect ratio.
+   Both absolutely position their .lbg__item cells; JS sets the geometry.
+   ========================================================================== */
+.lbg__grid {
+  position: relative;
+  width: 100%;
+}
+
+.lbg__grid .lbg__item {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: var(--lbg-surface);
+  border-radius: var(--lbg-radius);
+  overflow: hidden;
+  box-shadow: var(--lbg-shadow);
+  transition: transform var(--lbg-transition) ease,
+    left var(--lbg-transition) ease, top var(--lbg-transition) ease;
+}
+
+.lbg__grid .lbg__item:hover {
+  transform: translateY(-3px);
+}
+
+.lbg__grid .lbg__media {
+  display: block;
+  width: 100%;
+  background: var(--lbg-surface-2);
+  /* height set inline by JS from the image's intrinsic dimensions */
+}
+
+.lbg__grid .lbg__link:focus-visible {
+  outline: 2px solid var(--lbg-accent);
+  outline-offset: -2px;
+}
+
+/* Before JS lays it out, keep a graceful fallback flow. */
+.lbg__grid.is-unlaid .lbg__item {
+  position: static;
+  display: inline-block;
+  width: 240px;
+  margin: 0 var(--lbg-gap) var(--lbg-gap) 0;
+  vertical-align: top;
+}
+
+/* ==========================================================================
+   Lightbox overlay (singleton, appended to <body>)
+   ========================================================================== */
+.lbg-lightbox {
+  position: fixed;
+  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.lbg-lightbox.is-open {
+  display: flex;
+}
+
+.lbg-lightbox__backdrop {
+  position: absolute;
+  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--lbg-overlay-bg, rgba(6, 8, 12, 0.78));
+}
+
+.lbg-lightbox__dialog {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: var(--lbg-dialog-max-w, 960px);
+  height: 82vh;
+  background: var(--lbg-dialog-bg, #fff);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+}
+
+.lbg-lightbox__close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.lbg-lightbox__close:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.lbg-lightbox__close:focus-visible {
+  outline: 2px solid #6ea8fe;
+  outline-offset: 2px;
+}
+
+.lbg-lightbox__frame {
+  border: 0;
+  width: 100%;
+  height: 100%;
+  flex: 1 1 auto;
+  background: #fff;
+}
+
+.lbg-lightbox__spinner {
+  position: absolute;
+  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #555;
+  font: 14px system-ui, sans-serif;
+}
+
+.lbg-lightbox.is-loaded .lbg-lightbox__spinner {
+  display: none;
+}
+
+/* Prevent background scroll while the lightbox is open. */
+.lbg-lightbox-open {
+  overflow: hidden;
+}
+
+/* ==========================================================================
+   Reduced motion
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .lbg__track,
+  .lbg__grid .lbg__item,
+  .lbg__nav,
+  .lbg__mode-btn {
+    transition: none !important;
+  }
+}

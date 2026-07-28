@@ -4,7 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Lightbox Grid — Carousel / Masonry Demo</title>
-  <link rel="stylesheet" href="src/lightbox-grid.css">
+  <!-- Deployment links ONE theme build. This demo defaults to dark and the
+       toggle below swaps this href to the light build to preview both. -->
+  <link rel="stylesheet" href="src/lightbox-grid-dark.css" id="lbgStylesheet"
+        data-dark="src/lightbox-grid-dark.css" data-light="src/lightbox-grid-light.css">
   <style>
     /* Page chrome only — NOT part of the widget. */
     body {
@@ -13,8 +16,13 @@
       color: #e8eaed;
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
       line-height: 1.5;
+      transition: background 240ms, color 240ms;
     }
     .page { max-width: 1080px; margin: 0 auto; padding: 40px 20px 80px; }
+    .page-head {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 16px;
+    }
     .page h1 { margin: 0 0 6px; font-size: 1.9rem; }
     .page .sub { color: #9aa3ad; margin: 0 0 40px; }
     .demo { margin-bottom: 56px; }
@@ -22,16 +30,56 @@
     .demo > p { color: #9aa3ad; margin: 0 0 16px; font-size: 0.95rem; }
     code { background: #1e2228; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
     a.repo { color: #6ea8fe; }
+
+    /* Light/dark page toggle */
+    .theme-toggle {
+      flex: 0 0 auto;
+      appearance: none;
+      border: 1px solid #333a44;
+      background: #1e2228;
+      color: #e8eaed;
+      font: inherit;
+      font-size: 0.85rem;
+      padding: 8px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 240ms, color 240ms, border-color 240ms;
+    }
+    .theme-toggle:hover { background: #262b33; }
+    .theme-toggle:focus-visible { outline: 2px solid #6ea8fe; outline-offset: 2px; }
+
+    /* Light page chrome, applied when the toggle turns the page light. */
+    body.theme-light { background: #eef1f5; color: #1b1f24; }
+    body.theme-light .page .sub,
+    body.theme-light .demo > p { color: #5b636d; }
+    body.theme-light code { background: #e2e7ee; color: #1b1f24; }
+    body.theme-light a.repo { color: #2f6fed; }
+    body.theme-light .theme-toggle {
+      background: #ffffff; color: #1b1f24; border-color: #d7dce2;
+    }
+    body.theme-light .theme-toggle:hover { background: #eef1f5; }
+
+    @media (prefers-reduced-motion: reduce) {
+      body, .theme-toggle { transition: none; }
+    }
   </style>
 </head>
 <body>
   <div class="page">
-    <h1>Lightbox Grid</h1>
-    <p class="sub">
-      A dependency-free carousel / masonry widget with a same-origin iframe
-      lightbox. See <a class="repo" href="test.html">test.html</a> for the
-      automated + manual test harness.
-    </p>
+    <div class="page-head">
+      <div>
+        <h1>Lightbox Grid</h1>
+        <p class="sub">
+          A dependency-free carousel / masonry / rows widget with a same-origin
+          iframe lightbox. See <a class="repo" href="test.html">test.html</a> for
+          the automated + manual test harness.
+        </p>
+      </div>
+      <button type="button" class="theme-toggle" id="themeToggle" aria-pressed="false">
+        🌙 Dark
+      </button>
+    </div>
 
     <!-- Demo 1: default (carousel) with toggle + autoplay -->
     <section class="demo">
@@ -68,13 +116,16 @@
       </ul>
     </section>
 
-    <!-- Demo 2: masonry default, toggle enabled -->
+    <!-- Demo 2: justified rows default, all three modes selectable -->
     <section class="demo">
-      <h2>2. Masonry (default) &middot; toggle enabled</h2>
-      <p><code>data-mode="masonry"</code> — best-fit columns from the images'
-        intrinsic dimensions; switch to carousel with the toggle.</p>
+      <h2>2. Rows (default) &middot; all three modes selectable</h2>
+      <p><code>data-mode="rows"</code> — justified "expanding rows" (photo-platform
+        style): images keep their aspect ratio and each row scales to fill the
+        full width, so wider images take more space and the number of columns per
+        row varies. Use the toggle to switch between <em>Carousel</em>,
+        <em>Masonry</em> (uniform columns), and <em>Rows</em>.</p>
 
-      <ul rel="lightbox-grid" data-mode="masonry">
+      <ul rel="lightbox-grid" data-mode="rows">
         <li><ul>
           <li><img src="images/img4.svg" width="400" height="400" alt="Amber"></li>
           <li><a href="pages/page-4.html">Amber</a></li>
@@ -127,8 +178,67 @@
         </ul></li>
       </ul>
     </section>
+
+    <!-- Demo 4: rows with the toggle DISABLED -->
+    <section class="demo">
+      <h2>4. Rows &middot; toggle <em>disabled</em></h2>
+      <p><code>data-mode="rows" data-toggle="off"</code> — locks the widget to the
+        justified rows grid with no mode-switch UI. Theme follows whichever
+        stylesheet the page loads (use the Light/Dark toggle up top).</p>
+
+      <ul rel="lightbox-grid" data-mode="rows" data-toggle="off">
+        <li><ul>
+          <li><img src="images/img1.svg" width="400" height="300" alt="Aurora"></li>
+          <li><a href="pages/page-1.html">Aurora — northern light fields</a></li>
+        </ul></li>
+        <li><ul>
+          <li><img src="images/img4.svg" width="400" height="400" alt="Amber"></li>
+          <li><a href="pages/page-4.html">Amber — golden hour glow</a></li>
+        </ul></li>
+        <li><ul>
+          <li><img src="images/img3.svg" width="400" height="260" alt="Meadow"></li>
+          <li><a href="pages/page-3.html">Meadow — green rolling calm</a></li>
+        </ul></li>
+        <li><ul>
+          <li><img src="images/img5.svg" width="400" height="600" alt="Violet"></li>
+          <li><a href="pages/page-5.html">Violet — deep dusk hues</a></li>
+        </ul></li>
+        <li><ul>
+          <li><img src="images/img6.svg" width="400" height="340" alt="Lagoon"></li>
+          <li><a href="pages/page-6.html">Lagoon — still tidal blue</a></li>
+        </ul></li>
+        <li><ul>
+          <li><img src="images/img2.svg" width="400" height="520" alt="Coral"></li>
+          <li><a href="pages/page-2.html">Coral — warm reef mornings</a></li>
+        </ul></li>
+      </ul>
+    </section>
   </div>
 
   <script src="src/lightbox-grid.js"></script>
+  <script>
+    // Page-level light/dark toggle (demo chrome only). A real deployment links
+    // just ONE theme build; here we preview both by swapping the widget
+    // stylesheet's href, and flipping the surrounding page palette to match.
+    (function () {
+      var btn = document.getElementById("themeToggle");
+      var sheet = document.getElementById("lbgStylesheet");
+      if (!btn || !sheet) return;
+      var light = false;
+      function apply() {
+        sheet.setAttribute(
+          "href",
+          light ? sheet.getAttribute("data-light") : sheet.getAttribute("data-dark")
+        );
+        document.body.classList.toggle("theme-light", light);
+        btn.setAttribute("aria-pressed", light ? "true" : "false");
+        btn.textContent = light ? "☀️ Light" : "🌙 Dark";
+      }
+      btn.addEventListener("click", function () {
+        light = !light;
+        apply();
+      });
+    })();
+  </script>
 </body>
 </html>

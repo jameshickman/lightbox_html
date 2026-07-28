@@ -29,9 +29,35 @@ test.describe("demo page", () => {
   });
 
   test("enhances every flagged list", async ({ page }) => {
-    await expect(page.locator(".lbg")).toHaveCount(3);
+    await expect(page.locator(".lbg")).toHaveCount(4);
     // Source lists are hidden after enhancement.
-    await expect(page.locator("ul.lbg-source--enhanced")).toHaveCount(3);
+    await expect(page.locator("ul.lbg-source--enhanced")).toHaveCount(4);
+  });
+
+  test("fourth widget locks to rows (data-toggle=off)", async ({ page }) => {
+    const widget = page.locator(".lbg").nth(3); // demo 4: rows, toggle off
+    await expect(widget).toHaveClass(/lbg--rows/);
+    await expect(widget.locator(".lbg__modes")).toHaveCount(0);
+  });
+
+  test("page light/dark toggle swaps the widget stylesheet build", async ({ page }) => {
+    const toggle = page.getByRole("button", { name: /Dark|Light/ });
+    const sheet = page.locator("#lbgStylesheet");
+
+    // Deployment links ONE theme file; the demo starts on the dark build.
+    await expect(sheet).toHaveAttribute("href", /lightbox-grid-dark\.css/);
+    await expect(page.locator("body")).not.toHaveClass(/theme-light/);
+
+    await toggle.click(); // -> light build
+    await expect(sheet).toHaveAttribute("href", /lightbox-grid-light\.css/);
+    await expect(page.locator("body")).toHaveClass(/theme-light/);
+    // The light build's orange accent drives the active mode button.
+    const activeBtn = page.locator(".lbg").first().locator(".lbg__mode-btn.is-active");
+    await expect(activeBtn).toHaveCSS("background-color", "rgb(228, 133, 33)"); // #e48521
+
+    await toggle.click(); // -> dark build
+    await expect(sheet).toHaveAttribute("href", /lightbox-grid-dark\.css/);
+    await expect(page.locator("body")).not.toHaveClass(/theme-light/);
   });
 
   test("carousel next/prev navigation moves the track", async ({ page }) => {
@@ -80,17 +106,22 @@ test.describe("demo page", () => {
     await expect(widget.locator(".lbg__dot").nth(0)).toHaveClass(/is-active/);
   });
 
-  test("mode toggle switches carousel <-> masonry", async ({ page }) => {
+  test("mode toggle switches between all three modes", async ({ page }) => {
     const widget = page.locator(".lbg").first();
     await expect(widget).toHaveClass(/lbg--carousel/);
 
-    await widget.getByRole("button", { name: "Grid" }).click();
+    await widget.getByRole("button", { name: "Masonry", exact: true }).click();
     await expect(widget).toHaveClass(/lbg--masonry/);
     // Masonry items are absolutely positioned once laid out.
-    const first = widget.locator(".lbg__masonry .lbg__item").first();
-    await expect(first).toHaveCSS("position", "absolute");
+    const mItem = widget.locator(".lbg__masonry .lbg__item").first();
+    await expect(mItem).toHaveCSS("position", "absolute");
 
-    await widget.getByRole("button", { name: "Carousel" }).click();
+    await widget.getByRole("button", { name: "Rows", exact: true }).click();
+    await expect(widget).toHaveClass(/lbg--rows/);
+    const rItem = widget.locator(".lbg__rows .lbg__item").first();
+    await expect(rItem).toHaveCSS("position", "absolute");
+
+    await widget.getByRole("button", { name: "Carousel", exact: true }).click();
     await expect(widget).toHaveClass(/lbg--carousel/);
   });
 
@@ -101,11 +132,38 @@ test.describe("demo page", () => {
   });
 
   test("masonry produces a positive container height", async ({ page }) => {
-    const widget = page.locator(".lbg").nth(1); // demo 2 starts in masonry
+    const widget = page.locator(".lbg").nth(2); // demo 3 is masonry (toggle off)
     const h = await widget
       .locator(".lbg__masonry")
       .evaluate((el) => parseInt(el.style.height, 10));
     expect(h).toBeGreaterThan(0);
+  });
+
+  test("rows (justified) fills each row to the full container width", async ({ page }) => {
+    const widget = page.locator(".lbg").nth(1); // demo 2 starts in rows
+    await expect(widget).toHaveClass(/lbg--rows/);
+
+    const geom = await widget.locator(".lbg__rows").evaluate((grid) => {
+      const cw = grid.clientWidth;
+      const items = [...grid.querySelectorAll(".lbg__item")].map((it) => ({
+        top: it.offsetTop,
+        right: it.offsetLeft + it.offsetWidth,
+      }));
+      return { cw, containerH: parseInt(grid.style.height, 10), items };
+    });
+
+    expect(geom.containerH).toBeGreaterThan(0);
+
+    // Group items by row (shared top) and confirm each COMPLETE row's right edge
+    // reaches the container width (justified fill). The last row may be short.
+    const rows = {};
+    for (const it of geom.items) (rows[it.top] = rows[it.top] || []).push(it);
+    const tops = Object.keys(rows);
+    tops.forEach((t, i) => {
+      const isLast = i === tops.length - 1;
+      const rightEdge = Math.max(...rows[t].map((it) => it.right));
+      if (!isLast) expect(Math.abs(rightEdge - geom.cw)).toBeLessThanOrEqual(1);
+    });
   });
 
   test("lightbox opens, strips nav/footer, and closes", async ({ page }) => {
@@ -230,9 +288,10 @@ test.describe("mobile viewport", () => {
     await expect(page.locator(".lbg-lightbox.is-open")).toHaveCount(0);
   });
 
-  test("defaults to carousel on mobile even when data-mode is masonry", async ({ page }) => {
+  test("defaults to carousel on mobile even for a grid data-mode", async ({ page }) => {
     await page.goto("/index.html");
-    // Demo 2 and 3 declare data-mode="masonry" but have no data-mobile-mode.
+    // Demo 2 declares data-mode="rows" and demo 3 data-mode="masonry"; neither
+    // sets data-mobile-mode, so both fall back to the carousel on mobile.
     await expect(page.locator(".lbg").nth(1)).toHaveClass(/lbg--carousel/);
     await expect(page.locator(".lbg").nth(2)).toHaveClass(/lbg--carousel/);
   });

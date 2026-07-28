@@ -26,7 +26,9 @@
   "use strict";
 
   var REL_TOKEN = "lightbox-grid";
-  var MASONRY_MIN_COL = 220; /* px: target minimum column width */
+  var MASONRY_MIN_COL = 220; /* px: target minimum column width (masonry mode) */
+  var ROWS_ROW_H = 240; /* px: target row height for the justified "rows" grid */
+  var ROWS_MAX_ROW_SCALE = 1.5; /* cap upscaling of a short final justified row */
   var DEFAULT_TIMER = 5000; /* used only when data-timer is a bare/invalid value */
   var DEFAULT_MOBILE_BP = 640; /* px: at/below this width, links navigate directly */
   var SWIPE_MIN = 40; /* px: minimum horizontal travel to count as a swipe */
@@ -81,6 +83,27 @@
     }
     var n = parseInt(raw, 10);
     return isNaN(n) ? 16 : n;
+  }
+
+  function getRowHeight(node) {
+    // Read the --lbg-row-height custom property (the target row height that
+    // justified packing scales around) so the CSS remains the theming surface.
+    var raw;
+    try {
+      raw = window
+        .getComputedStyle(node)
+        .getPropertyValue("--lbg-row-height");
+    } catch (e) {
+      raw = "";
+    }
+    var n = parseInt(raw, 10);
+    return isNaN(n) || n <= 0 ? ROWS_ROW_H : n;
+  }
+
+  function normalizeMode(value) {
+    var v = ("" + (value || "")).toLowerCase();
+    if (v === "masonry" || v === "rows") return v;
+    return "carousel";
   }
 
   function debounce(fn, wait) {
@@ -355,18 +378,15 @@
     this.source = sourceUl;
     this.items = parseItems(sourceUl);
 
-    // Desktop initial view (data-mode). On mobile the default is carousel — a
-    // full masonry grid is awkward on phones — unless data-mobile-mode overrides
-    // it. The active view still recomputes on resize until the user toggles.
-    this.desktopMode =
-      sourceUl.getAttribute("data-mode") === "masonry" ? "masonry" : "carousel";
-    var mobileModeAttr = (
-      sourceUl.getAttribute("data-mobile-mode") || ""
-    ).toLowerCase();
-    this.mobileMode =
-      mobileModeAttr === "masonry" || mobileModeAttr === "carousel"
-        ? mobileModeAttr
-        : "carousel";
+    // Desktop initial view (data-mode: carousel | masonry | rows). On mobile the
+    // default is carousel — a full grid is awkward on phones — unless
+    // data-mobile-mode overrides it. The active view still recomputes on resize
+    // until the user toggles.
+    this.desktopMode = normalizeMode(sourceUl.getAttribute("data-mode"));
+    var mobileModeAttr = sourceUl.getAttribute("data-mobile-mode");
+    this.mobileMode = mobileModeAttr
+      ? normalizeMode(mobileModeAttr)
+      : "carousel";
     this.userChoseMode = false;
 
     // On narrow (mobile) viewports, links navigate directly instead of opening
@@ -401,6 +421,7 @@
     this.hoverPaused = false;
     this.userStopped = false;
     this.masonryLaidOut = false;
+    this.rowsLaidOut = false;
 
     this.id = "lbg-" + ++idCounter;
     this.build();
@@ -423,9 +444,11 @@
       modes.setAttribute("aria-label", "Display mode");
 
       this.carouselBtn = this.makeModeButton("carousel", "Carousel");
-      this.masonryBtn = this.makeModeButton("masonry", "Grid");
+      this.masonryBtn = this.makeModeButton("masonry", "Masonry");
+      this.rowsBtn = this.makeModeButton("rows", "Rows");
       modes.appendChild(this.carouselBtn);
       modes.appendChild(this.masonryBtn);
+      modes.appendChild(this.rowsBtn);
       toolbar.appendChild(modes);
       root.appendChild(toolbar);
       this.toolbar = toolbar;
@@ -434,6 +457,7 @@
     var stage = el("div", "lbg__stage");
     stage.appendChild(this.buildCarousel());
     stage.appendChild(this.buildMasonry());
+    stage.appendChild(this.buildRows());
     root.appendChild(stage);
 
     // Insert widget after the source list, then hide the source.
@@ -463,9 +487,7 @@
 
     this.updateModeUI();
     this.updateToolbarVisibility();
-    if (this.mode === "masonry") {
-      this.layoutMasonry();
-    }
+    this.layoutActive();
     this.startAutoplay();
 
     // On resize: hide/show the toggle for the viewport, and — until the user
@@ -476,11 +498,11 @@
       if (!self.userChoseMode) {
         var want = self.isMobile() ? self.mobileMode : self.desktopMode;
         if (want !== self.mode) {
-          self.setMode(want, false); /* setMode relayouts masonry as needed */
+          self.setMode(want, false); /* setMode relayouts the grid as needed */
           return;
         }
       }
-      if (self.mode === "masonry") self.layoutMasonry();
+      self.layoutActive();
     }, 120);
     window.addEventListener("resize", this.onResize);
   };
@@ -758,25 +780,49 @@
     }
   };
 
-  /* ---- Masonry ---------------------------------------------------------- */
+  /* ---- Grid modes (masonry columns + justified rows) -------------------- */
 
-  Widget.prototype.buildMasonry = function () {
-    var masonry = el("div", "lbg__masonry is-unlaid");
-    this.masonryItems = [];
+  // Both grid modes share the same DOM shape: a positioned container of
+  // .lbg__item cells. `modifier` is "masonry" or "rows"; the returned container
+  // carries both that class and the shared `lbg__grid` class. Returns the
+  // container and its item array (also stored on the widget).
+  Widget.prototype.buildGrid = function (modifier) {
+    var grid = el("div", "lbg__grid lbg__" + modifier + " is-unlaid");
+    var itemsArr = [];
     for (var i = 0; i < this.items.length; i++) {
       var item = el("div", "lbg__item");
       var built = this.makeItemLink(this.items[i]);
       item.appendChild(built.link);
       item._media = built.media;
       item._data = this.items[i];
-      masonry.appendChild(item);
-      this.masonryItems.push(item);
+      grid.appendChild(item);
+      itemsArr.push(item);
     }
-    this.masonry = masonry;
-    return masonry;
+    return { grid: grid, items: itemsArr };
   };
 
-  // Best-fit masonry: place each item into the currently shortest column.
+  Widget.prototype.buildMasonry = function () {
+    var built = this.buildGrid("masonry");
+    this.masonry = built.grid;
+    this.masonryItems = built.items;
+    return this.masonry;
+  };
+
+  Widget.prototype.buildRows = function () {
+    var built = this.buildGrid("rows");
+    this.rows = built.grid;
+    this.rowsItems = built.items;
+    return this.rows;
+  };
+
+  // Lay out whichever grid mode is currently active (no-op for the carousel).
+  Widget.prototype.layoutActive = function () {
+    if (this.mode === "masonry") this.layoutMasonry();
+    else if (this.mode === "rows") this.layoutRows();
+  };
+
+  // Classic masonry: uniform-width columns, each new item dropped into the
+  // currently shortest column so the stacks stay balanced.
   Widget.prototype.layoutMasonry = function () {
     var container = this.masonry;
     if (!container || !this.masonryItems.length) return;
@@ -786,7 +832,7 @@
       return;
     }
 
-    container.className = "lbg__masonry"; /* drop is-unlaid fallback */
+    container.className = "lbg__grid lbg__masonry"; /* drop is-unlaid fallback */
 
     var gap = getGap(this.root);
     var containerWidth = container.clientWidth;
@@ -831,21 +877,113 @@
     this.masonryLaidOut = true;
   };
 
+  // Justified ("expanding rows") grid, photo-platform style: pack items
+  // left-to-right into full-width rows. Each item keeps its intrinsic aspect
+  // ratio, so wider images claim more horizontal space and the number of columns
+  // per row varies with the images' shapes. Every complete row is scaled so its
+  // images share one height and the row exactly fills the container width.
+  Widget.prototype.layoutRows = function () {
+    var container = this.rows;
+    if (!container || !this.rowsItems.length) return;
+    // Can't measure when hidden (display:none => offsetWidth 0).
+    if (container.offsetWidth === 0) {
+      this.rowsLaidOut = false;
+      return;
+    }
+
+    container.className = "lbg__grid lbg__rows"; /* drop is-unlaid fallback */
+
+    var gap = getGap(this.root);
+    var containerWidth = container.clientWidth;
+    var targetH = getRowHeight(this.root);
+
+    var items = this.rowsItems;
+    var n = items.length;
+    var y = 0; /* running top offset for the next row */
+    var rowStart = 0;
+    var ratioSum = 0; /* sum of aspect ratios (w/h) for the pending row */
+
+    for (var i = 0; i < n; i++) {
+      var data = items[i]._data;
+      ratioSum += data.w / data.h;
+
+      var rowGaps = gap * (i - rowStart); /* count - 1 gaps in the row */
+      // Width the row would span at the target height.
+      var naturalWidth = ratioSum * targetH + rowGaps;
+      var isLast = i === n - 1;
+
+      if (naturalWidth >= containerWidth || isLast) {
+        // Row height that makes these images exactly fill the container width.
+        var rowH = (containerWidth - rowGaps) / ratioSum;
+        if (isLast && naturalWidth < containerWidth) {
+          // Incomplete final row: don't upscale a lone/short row too far.
+          rowH = Math.min(rowH, targetH * ROWS_MAX_ROW_SCALE);
+        }
+        y += this.placeRow(items, rowStart, i, rowH, gap, containerWidth, y);
+        rowStart = i + 1;
+        ratioSum = 0;
+      }
+    }
+
+    container.style.height = (y > 0 ? y - gap : 0) + "px";
+    this.rowsLaidOut = true;
+  };
+
+  // Position items [start..end] as one justified row at height rowH, widths
+  // proportional to each image's aspect ratio and summing (with gaps) to the
+  // container width. Returns the vertical advance (tallest item + gap) so the
+  // caller can stack the next row below, clearing captions of varying length.
+  Widget.prototype.placeRow = function (items, start, end, rowH, gap, containerWidth, top) {
+    var rowHr = Math.round(rowH);
+    var count = end - start + 1;
+    var contentWidth = containerWidth - gap * (count - 1);
+
+    var ratioSum = 0;
+    for (var k = start; k <= end; k++) {
+      ratioSum += items[k]._data.w / items[k]._data.h;
+    }
+
+    var maxItemH = 0;
+    var contentLeft = 0; /* float cursor in content space (excludes gaps) */
+    for (var j = 0; j < count; j++) {
+      var item = items[start + j];
+      var data = item._data;
+      var wFloat = ((data.w / data.h) / ratioSum) * contentWidth;
+
+      var leftRounded = Math.round(contentLeft);
+      // Pin the final item's right edge to contentWidth so rounding never leaves
+      // a sub-pixel gap or overflow at the row's end.
+      var rightRounded =
+        j === count - 1 ? contentWidth : Math.round(contentLeft + wFloat);
+
+      item.style.width = rightRounded - leftRounded + "px";
+      item.style.left = leftRounded + j * gap + "px";
+      item.style.top = top + "px";
+      item._media.style.height = rowHr + "px";
+
+      var itemH = item.offsetHeight; /* media + caption */
+      if (itemH > maxItemH) maxItemH = itemH;
+
+      contentLeft += wFloat;
+    }
+    return maxItemH + gap;
+  };
+
   /* ---- Mode switching --------------------------------------------------- */
 
   Widget.prototype.setMode = function (mode, userInitiated) {
-    if (mode !== "carousel" && mode !== "masonry") return;
+    if (mode !== "carousel" && mode !== "masonry" && mode !== "rows") return;
     if (userInitiated) this.userChoseMode = true;
     if (mode === this.mode) return;
     this.mode = mode;
     this.updateModeUI();
 
-    if (mode === "masonry") {
+    if (mode === "carousel") {
+      this.startAutoplay();
+    } else {
       this.stopAutoplay();
       // Lay out now that the container is visible.
-      this.layoutMasonry();
-    } else {
-      this.startAutoplay();
+      this.layoutActive();
     }
   };
 
@@ -867,18 +1005,16 @@
   Widget.prototype.updateModeUI = function () {
     this.root.className = "lbg lbg--" + this.mode;
     if (!this.toggleEnabled || !this.carouselBtn) return;
-    this.carouselBtn.className =
-      "lbg__mode-btn" + (this.mode === "carousel" ? " is-active" : "");
-    this.masonryBtn.className =
-      "lbg__mode-btn" + (this.mode === "masonry" ? " is-active" : "");
-    this.carouselBtn.setAttribute(
-      "aria-pressed",
-      this.mode === "carousel" ? "true" : "false"
-    );
-    this.masonryBtn.setAttribute(
-      "aria-pressed",
-      this.mode === "masonry" ? "true" : "false"
-    );
+    var btns = [
+      { btn: this.carouselBtn, mode: "carousel" },
+      { btn: this.masonryBtn, mode: "masonry" },
+      { btn: this.rowsBtn, mode: "rows" }
+    ];
+    for (var i = 0; i < btns.length; i++) {
+      var active = this.mode === btns[i].mode;
+      btns[i].btn.className = "lbg__mode-btn" + (active ? " is-active" : "");
+      btns[i].btn.setAttribute("aria-pressed", active ? "true" : "false");
+    }
   };
 
   /* ====================================================================== *
