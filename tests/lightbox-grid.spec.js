@@ -1,5 +1,39 @@
 const { test, expect } = require("@playwright/test");
 
+// The JS-positioned grids animate `left`/`top` via a CSS transition, so
+// offsetLeft/offsetTop read mid-transition until the layout settles. Poll until
+// every tile's geometry is unchanged for a few frames before measuring.
+async function settleGrid(gridLocator) {
+  await gridLocator.evaluate(
+    (grid) =>
+      new Promise((resolve) => {
+        let last = "";
+        let stable = 0;
+        (function tick() {
+          const sig = [...grid.querySelectorAll(".lbg__item")]
+            .map(
+              (it) =>
+                it.offsetLeft +
+                "," +
+                it.offsetTop +
+                "," +
+                it.offsetWidth +
+                "," +
+                it.offsetHeight
+            )
+            .join("|");
+          if (sig === last) stable++;
+          else {
+            stable = 0;
+            last = sig;
+          }
+          if (stable >= 3) resolve();
+          else requestAnimationFrame(tick);
+        })();
+      })
+  );
+}
+
 // ---------------------------------------------------------------------------
 // 1. Drive the in-browser harness (test.html) and require every assertion pass.
 // ---------------------------------------------------------------------------
@@ -142,6 +176,7 @@ test.describe("demo page", () => {
   test("rows (justified) fills each row to the full container width", async ({ page }) => {
     const widget = page.locator(".lbg").nth(1); // demo 2 starts in rows
     await expect(widget).toHaveClass(/lbg--rows/);
+    await settleGrid(widget.locator(".lbg__rows"));
 
     const geom = await widget.locator(".lbg__rows").evaluate((grid) => {
       const cw = grid.clientWidth;
@@ -164,6 +199,47 @@ test.describe("demo page", () => {
       const rightEdge = Math.max(...rows[t].map((it) => it.right));
       if (!isLast) expect(Math.abs(rightEdge - geom.cw)).toBeLessThanOrEqual(1);
     });
+  });
+
+  test("optional title renders inline as a bold lead; untitled items omit it", async ({ page }) => {
+    const widget = page.locator(".lbg").nth(1); // demo 2: rows, mixed titles
+    const items = widget.locator(".lbg__rows .lbg__item");
+
+    // The Amber item declares a title <li>; it renders as a bold .lbg__title
+    // lead, inline with the link label in one caption ("Amber — golden hour glow").
+    const amber = items.filter({ hasText: "golden hour glow" });
+    await expect(amber.locator(".lbg__title")).toHaveText("Amber");
+    await expect(amber.locator(".lbg__caption")).toHaveText("Amber — golden hour glow");
+
+    // The Meadow item declares no title <li>: no .lbg__title element at all.
+    const untitled = items.filter({ hasText: "Meadow (no title)" });
+    await expect(untitled).toHaveCount(1);
+    await expect(untitled.locator(".lbg__title")).toHaveCount(0);
+  });
+
+  test("rows give every tile in a row a consistent height (title-aware)", async ({ page }) => {
+    const widget = page.locator(".lbg").nth(1); // demo 2 starts in rows
+    await expect(widget).toHaveClass(/lbg--rows/);
+    await settleGrid(widget.locator(".lbg__rows"));
+
+    // Group tiles by their top offset (one group per justified row); within any
+    // multi-item row, uneven title/label lengths must NOT produce uneven heights.
+    const rows = await widget.locator(".lbg__rows").evaluate((grid) => {
+      const map = {};
+      grid.querySelectorAll(".lbg__item").forEach((it) => {
+        (map[it.offsetTop] = map[it.offsetTop] || []).push(it.offsetHeight);
+      });
+      return Object.keys(map).map((k) => map[k]);
+    });
+
+    let multiItemRows = 0;
+    for (const heights of rows) {
+      if (heights.length < 2) continue;
+      multiItemRows++;
+      const h0 = heights[0];
+      for (const h of heights) expect(Math.abs(h - h0)).toBeLessThanOrEqual(1);
+    }
+    expect(multiItemRows).toBeGreaterThan(0);
   });
 
   test("lightbox opens, strips nav/footer, and closes", async ({ page }) => {

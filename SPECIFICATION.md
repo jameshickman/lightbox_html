@@ -30,13 +30,14 @@ attribute and manages each one. Expected structure:
   <li>
     <ul>
       <li><img src="a.jpg" width="400" height="300" alt="Description A"></li>
-      <li><a href="/page-a">Title A</a></li>
+      <li>Optional Title A</li>
+      <li><a href="/page-a">Link text A</a></li>
     </ul>
   </li>
   <li>
     <ul>
       <li><img src="b.jpg" width="400" height="500" alt="Description B"></li>
-      <li><a href="/page-b">Title B</a></li>
+      <li><a href="/page-b">Link text B</a></li>
     </ul>
   </li>
   <!-- ... more items ... -->
@@ -48,9 +49,16 @@ Rules:
 - The **outer `<ul>`** carries the `rel` token **`lightbox-grid`**, used only as
   the activation flag. Matching is space-token aware (`rel~="lightbox-grid"`), so
   additional `rel` tokens may coexist.
-- Each **outer `<li>`** is one item and contains an **inner `<ul>`** with:
-  - one `<li>` holding an `<img>`, and
+- Each **outer `<li>`** is one item and contains an **inner `<ul>`** with, in order:
+  - one `<li>` holding an `<img>`,
+  - **optionally**, one `<li>` holding a **title** (plain text or inline markup,
+    with no `<a href>`), and
   - one `<li>` holding an `<a href>` with the item's text label.
+- The **title `<li>` is optional and identified by position/content**: it is the
+  inner `<li>` that sits **between the image `<li>` and the link `<li>`** and does
+  **not** contain an `<a href>`. When present it is rendered as a caption above
+  the link; when absent the item shows only the image and the link. Items within
+  the same grid may freely mix titled and untitled entries.
 - **Images MUST specify `width` and `height`** (intrinsic pixel dimensions) so
   the masonry layout can compute aspect ratios without waiting for image load.
   Images should also carry meaningful `alt` text.
@@ -94,7 +102,7 @@ runtime via a **toggle UI element** the widget renders.
 
 ### Carousel
 
-- Each image + link pair is rendered as a carousel slide.
+- Each item (image, optional title, and link) is rendered as a carousel slide.
 - **Navigation arrows** (previous / next) and **dot indicators** are always
   available; slides wrap around at both ends.
 - **Autoplay:** when `data-timer` is a positive number, slides advance
@@ -118,6 +126,26 @@ runtime via a **toggle UI element** the widget renders.
   dimensions (aspect ratios) to pack columns with minimal ragged whitespace.
 - Responsive: column count adapts to available width.
 - Uses the intrinsic `width`/`height` so layout is stable before images load.
+- **Each tile's height is the image height plus the height of its text region**
+  (the optional title and the link). The packing algorithm must account for this
+  combined height — not the image alone — when placing tiles, so the column
+  balancing and vertical rhythm stay correct once captions are included. Because
+  the title is optional and text wrapping varies, tiles in the same column may
+  have different text-block heights; the layout measures the full rendered tile
+  height rather than assuming a fixed caption size.
+
+### Consistent tile heights within a row
+
+- The grid may present items in **rows** (e.g. a justified/"rows" layout, or any
+  mode where several tiles share a horizontal band). Within such a row **all
+  tiles must render at a consistent height.**
+- When one tile in a row grows taller — because its title wraps to more lines,
+  its link text is longer, or its image aspect ratio is taller — **every other
+  tile in that row expands to match the tallest tile.** Tiles never leave a
+  ragged bottom edge or misaligned baselines across a row.
+- Height equalisation accounts for the **text as well as the image**: a tile with
+  a two-line title is as tall as its row-mates even if their images are the same
+  size, and the extra space is distributed so images and captions stay aligned.
 
 ## Lightbox Behavior
 
@@ -219,6 +247,9 @@ Previously-open questions, now settled and reflected in the implementation:
 - **Mobile** — links navigate directly (no modal) at/below
   `data-mobile-breakpoint` (default `640px`), and the view defaults to carousel
   (override with `data-mobile-mode`); see [Mobile Behavior](#mobile-behavior).
+- **Optional title** — an item may include a title `<li>` between the image and
+  the link; tile and masonry sizing account for its (and the link's) rendered
+  height so rows stay height-consistent and columns pack correctly.
 - **Touch** — the carousel supports finger-swipe navigation with snap.
 - **Back button** — opening the lightbox pushes a history entry so back closes
   the overlay instead of leaving the page.

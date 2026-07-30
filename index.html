@@ -116,39 +116,49 @@
       </ul>
     </section>
 
-    <!-- Demo 2: justified rows default, all three modes selectable -->
+    <!-- Demo 2: justified rows default, all three modes selectable.
+         Items carry an OPTIONAL title <li> between the image and the link;
+         titles of varying length (and one item with none) show that every tile
+         in a row still resolves to a consistent height. -->
     <section class="demo">
-      <h2>2. Rows (default) &middot; all three modes selectable</h2>
+      <h2>2. Rows (default) &middot; optional titles &middot; all three modes selectable</h2>
       <p><code>data-mode="rows"</code> — justified "expanding rows" (photo-platform
         style): images keep their aspect ratio and each row scales to fill the
-        full width, so wider images take more space and the number of columns per
-        row varies. Use the toggle to switch between <em>Carousel</em>,
+        full width. Each item may include an optional <strong>title</strong>
+        between the image and the link; titles of different lengths (and one item
+        with none) still line up because every tile in a row grows to a consistent
+        height. Use the toggle to switch between <em>Carousel</em>,
         <em>Masonry</em> (uniform columns), and <em>Rows</em>.</p>
 
       <ul rel="lightbox-grid" data-mode="rows">
         <li><ul>
           <li><img src="images/img4.svg" width="400" height="400" alt="Amber"></li>
-          <li><a href="pages/page-4.html">Amber</a></li>
+          <li>Amber</li>
+          <li><a href="pages/page-4.html">golden hour glow</a></li>
         </ul></li>
         <li><ul>
           <li><img src="images/img1.svg" width="400" height="300" alt="Aurora"></li>
-          <li><a href="pages/page-1.html">Aurora</a></li>
+          <li>Aurora over the northern light fields at midnight</li>
+          <li><a href="pages/page-1.html">read the field notes</a></li>
         </ul></li>
         <li><ul>
           <li><img src="images/img5.svg" width="400" height="600" alt="Violet"></li>
-          <li><a href="pages/page-5.html">Violet</a></li>
+          <li>Violet</li>
+          <li><a href="pages/page-5.html">deep dusk hues</a></li>
         </ul></li>
         <li><ul>
           <li><img src="images/img3.svg" width="400" height="260" alt="Meadow"></li>
-          <li><a href="pages/page-3.html">Meadow</a></li>
+          <li><a href="pages/page-3.html">Meadow (no title)</a></li>
         </ul></li>
         <li><ul>
           <li><img src="images/img6.svg" width="400" height="340" alt="Lagoon"></li>
-          <li><a href="pages/page-6.html">Lagoon</a></li>
+          <li>Lagoon</li>
+          <li><a href="pages/page-6.html">still tidal blue</a></li>
         </ul></li>
         <li><ul>
           <li><img src="images/img2.svg" width="400" height="520" alt="Coral"></li>
-          <li><a href="pages/page-2.html">Coral</a></li>
+          <li>Coral reef mornings, warm and slow to wake</li>
+          <li><a href="pages/page-2.html">open the gallery</a></li>
         </ul></li>
       </ul>
     </section>

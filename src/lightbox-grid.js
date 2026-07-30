@@ -16,7 +16,8 @@
        <li>
          <ul>
            <li><img src="a.jpg" width="400" height="300" alt="A"></li>
-           <li><a href="/page-a">Title A</a></li>
+           <li>Optional Title A</li>   <!-- optional: between image and link -->
+           <li><a href="/page-a">Link text A</a></li>
          </ul>
        </li>
        ...
@@ -127,12 +128,60 @@
 
   /* ---- parse source markup into plain data ------------------------------ */
 
+  function trim(s) {
+    return ("" + (s == null ? "" : s)).replace(/^\s+|\s+$/g, "");
+  }
+
+  // Direct <li> children of a list node (skips text nodes / nested lists).
+  function directChildLis(node) {
+    var out = [];
+    var kids = node.children;
+    for (var i = 0; i < kids.length; i++) {
+      if (kids[i].tagName === "LI") out.push(kids[i]);
+    }
+    return out;
+  }
+
+  // The direct <li> child of `ul` that contains `node` (or null).
+  function childLiOf(node, ul) {
+    while (node && node.parentNode !== ul) node = node.parentNode;
+    return node && node.tagName === "LI" ? node : null;
+  }
+
+  function indexInArray(arr, node) {
+    for (var i = 0; i < arr.length; i++) {
+      if (arr[i] === node) return i;
+    }
+    return -1;
+  }
+
+  // The optional title is the inner <li> that sits BETWEEN the image <li> and
+  // the link <li> and contains no <a href>. Returns its trimmed text, or ""
+  // when absent. Position-based so titled and untitled items can freely mix.
+  function extractTitle(img, anchor) {
+    var innerUl = img.parentNode;
+    while (innerUl && innerUl.tagName !== "UL") innerUl = innerUl.parentNode;
+    if (!innerUl) return "";
+    var lis = directChildLis(innerUl);
+    var imgIdx = indexInArray(lis, childLiOf(img, innerUl));
+    var linkIdx = indexInArray(lis, childLiOf(anchor, innerUl));
+    if (imgIdx < 0 || linkIdx < 0) return "";
+    var lo = imgIdx < linkIdx ? imgIdx : linkIdx;
+    var hi = imgIdx < linkIdx ? linkIdx : imgIdx;
+    for (var k = lo + 1; k < hi; k++) {
+      if (lis[k].getElementsByTagName("a").length === 0) {
+        var t = trim(lis[k].textContent || lis[k].innerText || "");
+        if (t) return t;
+      }
+    }
+    return "";
+  }
+
   function parseItems(sourceUl) {
     var items = [];
-    var outerLis = sourceUl.children;
+    var outerLis = directChildLis(sourceUl);
     for (var i = 0; i < outerLis.length; i++) {
       var li = outerLis[i];
-      if (li.tagName !== "LI") continue;
       var img = li.getElementsByTagName("img")[0];
       var anchor = li.getElementsByTagName("a")[0];
       if (!img || !anchor) continue;
@@ -142,10 +191,8 @@
 
       items.push({
         href: anchor.getAttribute("href"),
-        title: (anchor.textContent || anchor.innerText || "").replace(
-          /^\s+|\s+$/g,
-          ""
-        ),
+        label: trim(anchor.textContent || anchor.innerText || ""),
+        title: extractTitle(img, anchor),
         src: img.getAttribute("src"),
         alt: img.getAttribute("alt") || "",
         w: w > 0 ? w : 1,
@@ -548,12 +595,21 @@
     img.setAttribute("height", item.h);
     img.setAttribute("loading", "lazy");
     media.appendChild(img);
-
-    var caption = el("span", "lbg__caption");
-    caption.appendChild(document.createTextNode(item.title));
-
     link.appendChild(media);
+
+    // Caption line. When the item supplied a title, it renders inline as a bold
+    // lead followed by an em-dash and the link label ("Title — label"); with no
+    // title the caption is just the link label.
+    var caption = el("span", "lbg__caption");
+    if (item.title) {
+      var title = el("strong", "lbg__title");
+      title.appendChild(document.createTextNode(item.title));
+      caption.appendChild(title);
+      caption.appendChild(document.createTextNode(" — "));
+    }
+    caption.appendChild(document.createTextNode(item.label));
     link.appendChild(caption);
+
     return { link: link, media: media };
   };
 
@@ -943,6 +999,7 @@
       ratioSum += items[k]._data.w / items[k]._data.h;
     }
 
+    var rowItems = [];
     var maxItemH = 0;
     var contentLeft = 0; /* float cursor in content space (excludes gaps) */
     for (var j = 0; j < count; j++) {
@@ -959,13 +1016,25 @@
       item.style.width = rightRounded - leftRounded + "px";
       item.style.left = leftRounded + j * gap + "px";
       item.style.top = top + "px";
+      item.style.height = ""; /* clear a prior equalized height before measuring */
       item._media.style.height = rowHr + "px";
 
-      var itemH = item.offsetHeight; /* media + caption */
+      // Full natural height = image (rowHr) + text region (optional title + link
+      // label, which may wrap). Measured after width is set so wrapping counts.
+      var itemH = item.offsetHeight;
       if (itemH > maxItemH) maxItemH = itemH;
 
+      rowItems.push(item);
       contentLeft += wFloat;
     }
+
+    // Consistent tile height: every tile in the row grows to match the tallest
+    // one, so a longer title/label (more wrapped lines) never leaves a ragged
+    // bottom edge across the row. Images stay top-aligned at the shared rowHr.
+    for (var p = 0; p < rowItems.length; p++) {
+      rowItems[p].style.height = maxItemH + "px";
+    }
+
     return maxItemH + gap;
   };
 
