@@ -48,6 +48,18 @@ page's main content.
    </ul>
    ```
 
+   Or express the same structure with `<div>`s — `rel` is not valid on a
+   `<div>`, so flag those with `data-rel` instead:
+
+   ```html
+   <div data-rel="lightbox-grid" data-mode="carousel" data-timer="5000">
+     <div><div>
+       <div><img src="images/a.jpg" width="400" height="300" alt="Aurora"></div>
+       <div><a href="/pages/aurora.html">Aurora</a></div>
+     </div></div>
+   </div>
+   ```
+
 The script auto-initializes on `DOMContentLoaded`. Open `index.html` for a live
 demo, or see the non-technical setup guide in
 [`Lightbox-Grid-Setup-Guide.docx`](Lightbox-Grid-Setup-Guide.docx) /
@@ -55,22 +67,28 @@ demo, or see the non-technical setup guide in
 
 ## Markup contract
 
-- The **outer `<ul>`** carries the `rel` token `lightbox-grid` (matched
-  space-token aware, so other `rel` tokens may coexist).
-- Each **outer `<li>`** is one item containing an **inner `<ul>`** with:
-  - one `<li>` holding an `<img>`, and
-  - one `<li>` holding an `<a href>` with the item's caption.
+- The **container** — a `<ul>`, `<ol>`, or `<div>` — carries the
+  `lightbox-grid` token in `rel` or `data-rel` (matched space-token aware, so
+  other tokens may coexist).
+- Each **direct child** of the container (`<li>` or `<div>`) is one item
+  containing an **inner group** with:
+  - one cell holding an `<img>`,
+  - optionally, one cell holding a plain-text **title**, and
+  - one cell holding an `<a href>` with the item's caption.
+- Cells are matched **by position, not by tag**, so list and div markup work
+  the same way and can be mixed. The inner group may also be dropped, putting
+  the image, title and link directly inside the item.
 - **Images must specify `width` and `height`** (intrinsic pixel size) so the
   grid layouts (masonry and rows) are stable before images load. Include
   meaningful `alt` text.
 
 ## Configuration
 
-Set these as attributes on the outer `<ul>`:
+Set these as attributes on the container:
 
 | Attribute                | Purpose                                                        | Default            |
 | ------------------------ | -------------------------------------------------------------- | ------------------ |
-| `rel`                    | Activation flag (token `lightbox-grid`)                        | required           |
+| `rel` / `data-rel`       | Activation flag (token `lightbox-grid`)                        | required           |
 | `data-mode`              | Initial view: `carousel`, `masonry`, or `rows`                 | `carousel`         |
 | `data-timer`             | Carousel autoplay interval in milliseconds                     | autoplay **off**   |
 | `data-toggle`            | `off` / `disabled` / `false` / `none` hides the mode toggle    | toggle **enabled** |

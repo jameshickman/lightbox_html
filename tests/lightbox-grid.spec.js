@@ -62,16 +62,35 @@ test.describe("demo page", () => {
     await page.goto("/index.html");
   });
 
-  test("enhances every flagged list", async ({ page }) => {
-    await expect(page.locator(".lbg")).toHaveCount(4);
-    // Source lists are hidden after enhancement.
+  test("enhances every flagged container", async ({ page }) => {
+    await expect(page.locator(".lbg")).toHaveCount(5);
+    // Sources are hidden after enhancement — four lists plus one div.
     await expect(page.locator("ul.lbg-source--enhanced")).toHaveCount(4);
+    await expect(page.locator("div.lbg-source--enhanced")).toHaveCount(1);
   });
 
   test("fourth widget locks to rows (data-toggle=off)", async ({ page }) => {
     const widget = page.locator(".lbg").nth(3); // demo 4: rows, toggle off
     await expect(widget).toHaveClass(/lbg--rows/);
     await expect(widget.locator(".lbg__modes")).toHaveCount(0);
+  });
+
+  test("div-sourced widget renders and opens the lightbox like a list one", async ({
+    page,
+  }) => {
+    const widget = page.locator(".lbg").nth(4); // demo 5: div markup, rows
+    await expect(widget).toHaveClass(/lbg--rows/);
+    const items = widget.locator(".lbg__rows .lbg__item");
+    await expect(items).toHaveCount(4);
+    // Titles parse from div cells exactly as they do from <li> cells.
+    await expect(items.first().locator(".lbg__title")).toHaveText("Coral");
+    await expect(items.nth(1).locator(".lbg__title")).toHaveCount(0);
+
+    await items.first().locator(".lbg__link").click();
+    const overlay = page.locator(".lbg-lightbox");
+    await expect(overlay).toHaveClass(/is-open/);
+    await page.keyboard.press("Escape");
+    await expect(overlay).not.toHaveClass(/is-open/);
   });
 
   test("page light/dark toggle swaps the widget stylesheet build", async ({ page }) => {

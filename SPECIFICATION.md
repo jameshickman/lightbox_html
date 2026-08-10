@@ -22,8 +22,8 @@ page inside a **lightbox overlay** showing only that page's main content.
 
 ## Source Markup Contract
 
-The widget scans the document for outer unordered lists flagged with a `rel`
-attribute and manages each one. Expected structure:
+The widget scans the document for flagged containers — an outer list
+(`<ul>`/`<ol>`) or a `<div>` — and manages each one. Expected structure:
 
 ```html
 <ul rel="lightbox-grid" data-mode="carousel" data-timer="5000">
@@ -44,18 +44,47 @@ attribute and manages each one. Expected structure:
 </ul>
 ```
 
+### Div markup
+
+The identical structure may be expressed with `<div>`s, which some CMSes and
+page builders emit more naturally than nested lists:
+
+```html
+<div data-rel="lightbox-grid" data-mode="carousel" data-timer="5000">
+  <div>
+    <div>
+      <div><img src="a.jpg" width="400" height="300" alt="Description A"></div>
+      <div>Optional Title A</div>
+      <div><a href="/page-a">Link text A</a></div>
+    </div>
+  </div>
+  <!-- ... more items ... -->
+</div>
+```
+
+Both styles are supported, may be mixed within one container, and behave
+identically thereafter. `rel` is not a conformant attribute on a `<div>`, so
+div containers may carry **`data-rel="lightbox-grid"`** instead; the widget
+reads either attribute.
+
 Rules:
 
-- The **outer `<ul>`** carries the `rel` token **`lightbox-grid`**, used only as
-  the activation flag. Matching is space-token aware (`rel~="lightbox-grid"`), so
-  additional `rel` tokens may coexist.
-- Each **outer `<li>`** is one item and contains an **inner `<ul>`** with, in order:
-  - one `<li>` holding an `<img>`,
-  - **optionally**, one `<li>` holding a **title** (plain text or inline markup,
+- The **container** carries the `lightbox-grid` token in `rel` (or `data-rel`),
+  used only as the activation flag. Matching is space-token aware
+  (`rel~="lightbox-grid"`), so additional tokens may coexist.
+- Each direct child element of the container (an `<li>` or a `<div>`) is one
+  **item**, and contains an **inner group** with, in order:
+  - one cell holding an `<img>`,
+  - **optionally**, one cell holding a **title** (plain text or inline markup,
     with no `<a href>`), and
-  - one `<li>` holding an `<a href>` with the item's text label.
-- The **title `<li>` is optional and identified by position/content**: it is the
-  inner `<li>` that sits **between the image `<li>` and the link `<li>`** and does
+  - one cell holding an `<a href>` with the item's text label.
+- Parsing is **structural, not tag-driven**: cells are matched by position
+  within their group, so the wrapper tags may be `<li>`, `<div>`, or anything
+  else. The inner group may also be omitted entirely, placing the image, title
+  and link directly inside the item.
+- An item that contains no `<img>` or no `<a href>` is skipped.
+- The **title cell is optional and identified by position/content**: it is the
+  cell that sits **between the image cell and the link cell** and does
   **not** contain an `<a href>`. When present it is rendered as a caption above
   the link; when absent the item shows only the image and the link. Items within
   the same grid may freely mix titled and untitled entries.
@@ -63,13 +92,13 @@ Rules:
   the masonry layout can compute aspect ratios without waiting for image load.
   Images should also carry meaningful `alt` text.
 - If the widget's JS does not run (no-JS / progressive enhancement), the raw
-  nested list remains readable and the links work as normal navigation.
+  source markup remains readable and the links work as normal navigation.
 
-## Configuration (data-attributes on the outer `<ul>`)
+## Configuration (data-attributes on the container)
 
 | Attribute               | Purpose                                                        | Default            |
 | ----------------------- | -------------------------------------------------------------- | ------------------ |
-| `rel`                   | Activation flag (token `lightbox-grid`)                        | required           |
+| `rel` / `data-rel`      | Activation flag (token `lightbox-grid`)                        | required           |
 | `data-mode`             | Initial display mode: `carousel` or `masonry`                  | `carousel`         |
 | `data-timer`            | Carousel autoplay interval in milliseconds                     | autoplay **off**   |
 | `data-toggle`           | `off` / `disabled` / `false` / `none` hides the mode-toggle UI | toggle **enabled** |
@@ -230,7 +259,8 @@ Rationale and trade-offs:
 
 ## Accessibility & Progressive Enhancement (guidance)
 
-- Widget enhances existing, valid list markup; links remain functional without JS.
+- Widget enhances existing, valid markup (lists or divs); links remain
+  functional without JS.
 - Controls (arrows, toggle, close) are real focusable elements with ARIA labels.
 - Keyboard support: navigate carousel, operate toggle, close lightbox with `Esc`.
 - Respect `prefers-reduced-motion` for autoplay/transitions where feasible.
@@ -250,7 +280,7 @@ Previously-open questions, now settled and reflected in the implementation:
 - **Mobile** — links navigate directly (no modal) at/below
   `data-mobile-breakpoint` (default `640px`), and the view defaults to carousel
   (override with `data-mobile-mode`); see [Mobile Behavior](#mobile-behavior).
-- **Optional title** — an item may include a title `<li>` between the image and
+- **Optional title** — an item may include a title cell between the image and
   the link; tile and masonry sizing account for its (and the link's) rendered
   height so rows stay height-consistent and columns pack correctly.
 - **Touch** — the carousel supports finger-swipe navigation with snap.

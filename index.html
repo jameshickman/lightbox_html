@@ -223,6 +223,38 @@
         </ul></li>
       </ul>
     </section>
+
+    <!-- Demo 5: identical structure built from DIVs instead of nested lists -->
+    <section class="demo">
+      <h2>5. <code>&lt;div&gt;</code> markup &middot; rows &middot; optional titles</h2>
+      <p>The same widget, sourced from nested <code>&lt;div&gt;</code>s rather
+        than nested lists. Div containers use
+        <code>data-rel="lightbox-grid"</code> (<code>rel</code> is not a valid
+        attribute on a <code>&lt;div&gt;</code>); everything else — modes,
+        titles, the lightbox — behaves identically.</p>
+
+      <div data-rel="lightbox-grid" data-mode="rows">
+        <div><div>
+          <div><img src="images/img2.svg" width="400" height="520" alt="Coral"></div>
+          <div>Coral</div>
+          <div><a href="pages/page-2.html">warm reef mornings</a></div>
+        </div></div>
+        <div><div>
+          <div><img src="images/img3.svg" width="400" height="260" alt="Meadow"></div>
+          <div><a href="pages/page-3.html">Meadow (no title)</a></div>
+        </div></div>
+        <div><div>
+          <div><img src="images/img5.svg" width="400" height="600" alt="Violet"></div>
+          <div>Violet</div>
+          <div><a href="pages/page-5.html">deep dusk hues</a></div>
+        </div></div>
+        <div><div>
+          <div><img src="images/img1.svg" width="400" height="300" alt="Aurora"></div>
+          <div>Aurora over the northern light fields</div>
+          <div><a href="pages/page-1.html">read the field notes</a></div>
+        </div></div>
+      </div>
+    </section>
   </div>
 
   <script src="src/lightbox-grid.js"></script>

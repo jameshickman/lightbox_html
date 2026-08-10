@@ -11,7 +11,7 @@
      <script src="src/lightbox-grid.js"></script>
      // auto-initializes on DOMContentLoaded; or call window.LightboxGrid.init()
 
-   Source markup contract (see SPECIFICATION.md):
+   Source markup contract (see SPECIFICATION.md) — EITHER nested lists:
      <ul rel="lightbox-grid">
        <li>
          <ul>
@@ -22,6 +22,26 @@
        </li>
        ...
      </ul>
+
+   ...OR the same structure built from <div>s:
+     <div rel="lightbox-grid">
+       <div>
+         <div>
+           <div><img src="a.jpg" width="400" height="300" alt="A"></div>
+           <div>Optional Title A</div>
+           <div><a href="/page-a">Link text A</a></div>
+         </div>
+       </div>
+       ...
+     </div>
+
+   The two styles may be mixed, and the inner wrapper may be omitted (image,
+   title and link placed directly inside the item). Parsing is structural, not
+   tag-driven: an item is a direct child element holding an <img> and an <a>,
+   and the title is the cell sitting between them.
+
+   `rel` is not a conformant attribute on <div>, so div containers may be
+   flagged with data-rel="lightbox-grid" instead; both are recognised.
    ========================================================================== */
 (function (window, document) {
   "use strict";
@@ -52,8 +72,11 @@
 
   /* ---- small helpers ---------------------------------------------------- */
 
+  // Activation flag. `rel` is the documented attribute, but it is only valid
+  // HTML on <a>/<link>/<form>, so div-based containers may use `data-rel`
+  // instead to keep the markup conformant. Either carries the same token.
   function hasRelToken(el) {
-    var rel = el.getAttribute("rel") || "";
+    var rel = (el.getAttribute("rel") || "") + " " + (el.getAttribute("data-rel") || "");
     var parts = rel.split(/\s+/);
     for (var i = 0; i < parts.length; i++) {
       if (parts[i] === REL_TOKEN) return true;
@@ -132,20 +155,40 @@
     return ("" + (s == null ? "" : s)).replace(/^\s+|\s+$/g, "");
   }
 
-  // Direct <li> children of a list node (skips text nodes / nested lists).
-  function directChildLis(node) {
+  // Elements accepted as a widget container: a list (<ul>/<ol>) or a <div>.
+  function isContainerTag(tag) {
+    return tag === "UL" || tag === "OL" || tag === "DIV";
+  }
+
+  // Elements accepted as one item within a container: <li> for list markup,
+  // <div> for div markup. The two may be mixed within one container.
+  function isItemTag(tag) {
+    return tag === "LI" || tag === "DIV";
+  }
+
+  // Direct item children of a container (skips text nodes and stray markup).
+  function directChildItems(node) {
     var out = [];
     var kids = node.children;
     for (var i = 0; i < kids.length; i++) {
-      if (kids[i].tagName === "LI") out.push(kids[i]);
+      if (isItemTag(kids[i].tagName)) out.push(kids[i]);
     }
     return out;
   }
 
-  // The direct <li> child of `ul` that contains `node` (or null).
-  function childLiOf(node, ul) {
-    while (node && node.parentNode !== ul) node = node.parentNode;
-    return node && node.tagName === "LI" ? node : null;
+  // Direct element children of a node, whatever their tag. Used for the cells
+  // inside one item, where position — not tag name — carries the meaning.
+  function childElements(node) {
+    var out = [];
+    var kids = node.children;
+    for (var i = 0; i < kids.length; i++) out.push(kids[i]);
+    return out;
+  }
+
+  // The direct child of `group` that contains `node` (or null).
+  function childCellOf(node, group) {
+    while (node && node.parentNode !== group) node = node.parentNode;
+    return node || null;
   }
 
   function indexInArray(arr, node) {
@@ -155,35 +198,49 @@
     return -1;
   }
 
-  // The optional title is the inner <li> that sits BETWEEN the image <li> and
-  // the link <li> and contains no <a href>. Returns its trimmed text, or ""
-  // when absent. Position-based so titled and untitled items can freely mix.
-  function extractTitle(img, anchor) {
-    var innerUl = img.parentNode;
-    while (innerUl && innerUl.tagName !== "UL") innerUl = innerUl.parentNode;
-    if (!innerUl) return "";
-    var lis = directChildLis(innerUl);
-    var imgIdx = indexInArray(lis, childLiOf(img, innerUl));
-    var linkIdx = indexInArray(lis, childLiOf(anchor, innerUl));
+  // The element whose direct children are one item's cells: the inner <ul> in
+  // list markup, the inner wrapper <div> in div markup. When the item has no
+  // inner wrapper (image/title/link sit directly inside it), the item itself
+  // is the group.
+  function groupOf(item, img) {
+    var node = img;
+    var parent = node.parentNode;
+    while (parent && parent !== item) {
+      node = parent;
+      parent = node.parentNode;
+    }
+    // `node` is now the ancestor of `img` that is a direct child of `item`.
+    return parent === item && node !== img ? node : item;
+  }
+
+  // The optional title is the cell that sits BETWEEN the image cell and the
+  // link cell and contains no <a href>. Returns its trimmed text, or "" when
+  // absent. Position-based so titled and untitled items can freely mix, and
+  // tag-agnostic so <li>, <div> or any other wrapper works.
+  function extractTitle(item, img, anchor) {
+    var group = groupOf(item, img);
+    var cells = childElements(group);
+    var imgIdx = indexInArray(cells, childCellOf(img, group));
+    var linkIdx = indexInArray(cells, childCellOf(anchor, group));
     if (imgIdx < 0 || linkIdx < 0) return "";
     var lo = imgIdx < linkIdx ? imgIdx : linkIdx;
     var hi = imgIdx < linkIdx ? linkIdx : imgIdx;
     for (var k = lo + 1; k < hi; k++) {
-      if (lis[k].getElementsByTagName("a").length === 0) {
-        var t = trim(lis[k].textContent || lis[k].innerText || "");
+      if (cells[k].getElementsByTagName("a").length === 0) {
+        var t = trim(cells[k].textContent || cells[k].innerText || "");
         if (t) return t;
       }
     }
     return "";
   }
 
-  function parseItems(sourceUl) {
+  function parseItems(source) {
     var items = [];
-    var outerLis = directChildLis(sourceUl);
-    for (var i = 0; i < outerLis.length; i++) {
-      var li = outerLis[i];
-      var img = li.getElementsByTagName("img")[0];
-      var anchor = li.getElementsByTagName("a")[0];
+    var itemEls = directChildItems(source);
+    for (var i = 0; i < itemEls.length; i++) {
+      var item = itemEls[i];
+      var img = item.getElementsByTagName("img")[0];
+      var anchor = item.getElementsByTagName("a")[0];
       if (!img || !anchor) continue;
 
       var w = toInt(img.getAttribute("width"), 0);
@@ -192,7 +249,7 @@
       items.push({
         href: anchor.getAttribute("href"),
         label: trim(anchor.textContent || anchor.innerText || ""),
-        title: extractTitle(img, anchor),
+        title: extractTitle(item, img, anchor),
         src: img.getAttribute("src"),
         alt: img.getAttribute("alt") || "",
         w: w > 0 ? w : 1,
@@ -420,19 +477,19 @@
   })();
 
   /* ====================================================================== *
-   *  Widget (one per enhanced <ul>)
+   *  Widget (one per enhanced source container)
    * ====================================================================== */
 
-  function Widget(sourceUl) {
-    this.source = sourceUl;
-    this.items = parseItems(sourceUl);
+  function Widget(source) {
+    this.source = source;
+    this.items = parseItems(source);
 
     // Desktop initial view (data-mode: carousel | masonry | rows). On mobile the
     // default is carousel — a full grid is awkward on phones — unless
     // data-mobile-mode overrides it. The active view still recomputes on resize
     // until the user toggles.
-    this.desktopMode = normalizeMode(sourceUl.getAttribute("data-mode"));
-    var mobileModeAttr = sourceUl.getAttribute("data-mobile-mode");
+    this.desktopMode = normalizeMode(source.getAttribute("data-mode"));
+    var mobileModeAttr = source.getAttribute("data-mobile-mode");
     this.mobileMode = mobileModeAttr
       ? normalizeMode(mobileModeAttr)
       : "carousel";
@@ -441,13 +498,13 @@
     // On narrow (mobile) viewports, links navigate directly instead of opening
     // the modal lightbox. The threshold is configurable per widget.
     this.mobileBreakpoint = toInt(
-      sourceUl.getAttribute("data-mobile-breakpoint"),
+      source.getAttribute("data-mobile-breakpoint"),
       DEFAULT_MOBILE_BP
     );
 
     this.mode = this.isMobile() ? this.mobileMode : this.desktopMode;
 
-    var timerAttr = sourceUl.getAttribute("data-timer");
+    var timerAttr = source.getAttribute("data-timer");
     // Autoplay is enabled only when a positive data-timer is provided.
     this.timer = null;
     if (timerAttr !== null && timerAttr !== "") {
@@ -457,7 +514,7 @@
 
     // The mode toggle UI can be disabled, locking the widget to data-mode.
     // data-toggle="off" | "disabled" | "false"  (default: enabled)
-    var toggleAttr = (sourceUl.getAttribute("data-toggle") || "").toLowerCase();
+    var toggleAttr = (source.getAttribute("data-toggle") || "").toLowerCase();
     this.toggleEnabled = !(
       toggleAttr === "off" ||
       toggleAttr === "disabled" ||
@@ -1096,13 +1153,15 @@
 
   function init(root) {
     var scope = root || document;
-    var lists = scope.getElementsByTagName("ul");
+    // Both markup styles are flagged the same way, so match on the rel token
+    // and accept any of the supported container tags (<ul>/<ol>/<div>).
+    var flagged = scope.querySelectorAll("[rel], [data-rel]");
     // Copy to a static array first (we mutate the DOM while iterating).
     var toEnhance = [];
-    for (var i = 0; i < lists.length; i++) {
-      var ul = lists[i];
-      if (hasRelToken(ul) && !ul._lbgEnhanced) {
-        toEnhance.push(ul);
+    for (var i = 0; i < flagged.length; i++) {
+      var node = flagged[i];
+      if (isContainerTag(node.tagName) && hasRelToken(node) && !node._lbgEnhanced) {
+        toEnhance.push(node);
       }
     }
     for (var j = 0; j < toEnhance.length; j++) {

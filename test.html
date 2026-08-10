@@ -94,6 +94,25 @@
         <li><a href="pages/page-6.html">still tidal blue</a></li>
       </ul></li>
     </ul>
+
+    <!-- Fixture D: the same contract expressed with DIVs instead of lists,
+         including one flat item (no inner wrapper) and one untitled item. -->
+    <div id="fixtureD" data-rel="lightbox-grid" data-mode="masonry" data-toggle="off">
+      <div><div>
+        <div><img src="images/img1.svg" width="400" height="300" alt="Aurora"></div>
+        <div>Aurora</div>
+        <div><a href="pages/page-1.html">northern light fields</a></div>
+      </div></div>
+      <div><div>
+        <div><img src="images/img2.svg" width="400" height="520" alt="Coral"></div>
+        <div><a href="pages/page-2.html">Coral — no title here</a></div>
+      </div></div>
+      <div>
+        <img src="images/img3.svg" width="400" height="260" alt="Meadow">
+        <span>Meadow</span>
+        <a href="pages/page-3.html">green rolling calm</a>
+      </div>
+    </div>
   </div>
 
   <script src="src/lightbox-grid.js"></script>
@@ -243,6 +262,22 @@
       }
       assert(rowsChecked > 0, "Rows C produced at least one multi-item row to check");
       assert(consistent, "All tiles in a row share a consistent height (title-aware)");
+
+      // --- DIV markup (Fixture D) parses identically to the nested lists
+      var fD = document.getElementById("fixtureD");
+      var wD = widgetAfter(fD);
+      var instD = window.LightboxGrid.instances[3];
+      assert(wD && wD.className.indexOf("lbg") === 0, "Fixture D (div markup) enhanced into .lbg root");
+      assert(fD.className.indexOf("lbg-source--enhanced") > -1, "Source D hidden after enhancement");
+      eq(instD.items.length, 3, "Div markup parsed 3 items");
+      eq(instD.items[0].title, "Aurora", "Div item parses its title cell");
+      eq(instD.items[0].label, "northern light fields", "Div item keeps the link text as its label");
+      eq(instD.items[0].src, "images/img1.svg", "Div item parses the image src");
+      eq(instD.items[1].title, "", "Div item without a title cell parses an empty title");
+      eq(instD.items[2].title, "Meadow", "Flat div item (no inner wrapper) still parses its title");
+      eq(instD.items[2].label, "green rolling calm", "Flat div item parses its link label");
+      eq(wD.querySelectorAll(".lbg__masonry .lbg__item").length, 3, "Div-sourced masonry rendered 3 items");
+      assert(!wD.querySelector(".lbg__modes"), "Div-sourced widget honours data-toggle=off");
 
       // --- Lightbox: opens on link click, injects styles, closes on Esc (async)
       testLightbox(wB, finish);
