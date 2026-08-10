@@ -63,10 +63,11 @@ test.describe("demo page", () => {
   });
 
   test("enhances every flagged container", async ({ page }) => {
-    await expect(page.locator(".lbg")).toHaveCount(5);
-    // Sources are hidden after enhancement — four lists plus one div.
+    await expect(page.locator(".lbg")).toHaveCount(6);
+    // Sources are hidden after enhancement — four lists plus two divs (one
+    // div-markup, one JSON-in-a-comment).
     await expect(page.locator("ul.lbg-source--enhanced")).toHaveCount(4);
-    await expect(page.locator("div.lbg-source--enhanced")).toHaveCount(1);
+    await expect(page.locator("div.lbg-source--enhanced")).toHaveCount(2);
   });
 
   test("fourth widget locks to rows (data-toggle=off)", async ({ page }) => {
@@ -86,6 +87,39 @@ test.describe("demo page", () => {
     await expect(items.first().locator(".lbg__title")).toHaveText("Coral");
     await expect(items.nth(1).locator(".lbg__title")).toHaveCount(0);
 
+    await items.first().locator(".lbg__link").click();
+    const overlay = page.locator(".lbg-lightbox");
+    await expect(overlay).toHaveClass(/is-open/);
+    await page.keyboard.press("Escape");
+    await expect(overlay).not.toHaveClass(/is-open/);
+  });
+
+  test("json-in-a-comment source renders items with titles and descriptions", async ({
+    page,
+  }) => {
+    const widget = page.locator(".lbg").nth(5); // demo 6: JSON comment, masonry
+    await expect(widget).toHaveClass(/lbg--masonry/);
+    const items = widget.locator(".lbg__masonry .lbg__item");
+    await expect(items).toHaveCount(4);
+
+    await expect(items.first().locator(".lbg__title")).toHaveText("Aurora");
+    await expect(items.first().locator(".lbg__desc")).toHaveText(
+      "Long-exposure frames from three nights above the tree line."
+    );
+    // Third entry supplies neither a title nor a description.
+    await expect(items.nth(2).locator(".lbg__title")).toHaveCount(0);
+    await expect(items.nth(2).locator(".lbg__desc")).toHaveCount(0);
+    // Fourth supplies a title but no description.
+    await expect(items.nth(3).locator(".lbg__title")).toHaveText("Violet");
+    await expect(items.nth(3).locator(".lbg__desc")).toHaveCount(0);
+
+    // Images carry the dimensions declared in the JSON.
+    const img = items.first().locator("img");
+    await expect(img).toHaveAttribute("width", "400");
+    await expect(img).toHaveAttribute("height", "300");
+    await expect(img).toHaveAttribute("alt", "Aurora");
+
+    // And the items behave like any other: clicking opens the lightbox.
     await items.first().locator(".lbg__link").click();
     const overlay = page.locator(".lbg-lightbox");
     await expect(overlay).toHaveClass(/is-open/);

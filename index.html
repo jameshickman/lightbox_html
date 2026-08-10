@@ -255,6 +255,35 @@
         </div></div>
       </div>
     </section>
+
+    <!-- Demo 6: items inlined as JSON inside the container's only comment -->
+    <section class="demo">
+      <h2>6. JSON in a comment &middot; masonry</h2>
+      <p>When a flagged container holds <em>nothing but</em> an HTML comment,
+        the comment is read as JSON describing the items. Each entry takes the
+        same optional <code>title</code> as the markup forms plus an optional
+        <code>description</code> — the muted second line below the caption.
+        Intended for generated pages where emitting markup is awkward; note it
+        has no no-JS fallback, since a comment renders nothing on its own.</p>
+
+      <div data-rel="lightbox-grid" data-mode="masonry">
+        <!-- [
+          {"src": "images/img1.svg", "width": 400, "height": 300, "alt": "Aurora",
+           "href": "pages/page-1.html", "label": "northern light fields",
+           "title": "Aurora",
+           "description": "Long-exposure frames from three nights above the tree line."},
+          {"src": "images/img4.svg", "width": 400, "height": 400, "alt": "Amber",
+           "href": "pages/page-4.html", "label": "golden hour glow",
+           "title": "Amber",
+           "description": "The last twenty minutes of light, shot wide open."},
+          {"src": "images/img6.svg", "width": 400, "height": 340, "alt": "Lagoon",
+           "href": "pages/page-6.html", "label": "Lagoon (no title, no description)"},
+          {"src": "images/img5.svg", "width": 400, "height": 600, "alt": "Violet",
+           "href": "pages/page-5.html", "label": "deep dusk hues",
+           "title": "Violet"}
+        ] -->
+      </div>
+    </section>
   </div>
 
   <script src="src/lightbox-grid.js"></script>

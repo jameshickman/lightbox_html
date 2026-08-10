@@ -23,7 +23,10 @@ page inside a **lightbox overlay** showing only that page's main content.
 ## Source Markup Contract
 
 The widget scans the document for flagged containers — an outer list
-(`<ul>`/`<ol>`) or a `<div>` — and manages each one. Expected structure:
+(`<ul>`/`<ol>`) or a `<div>` — and manages each one. A container describes its
+items in one of three interchangeable forms: [nested lists](#source-markup-contract)
+(below), [nested divs](#div-markup), or [JSON in a comment](#json-in-a-comment).
+Expected structure:
 
 ```html
 <ul rel="lightbox-grid" data-mode="carousel" data-timer="5000">
@@ -56,6 +59,7 @@ page builders emit more naturally than nested lists:
       <div><img src="a.jpg" width="400" height="300" alt="Description A"></div>
       <div>Optional Title A</div>
       <div><a href="/page-a">Link text A</a></div>
+      <div>Optional description A</div>
     </div>
   </div>
   <!-- ... more items ... -->
@@ -76,8 +80,9 @@ Rules:
   **item**, and contains an **inner group** with, in order:
   - one cell holding an `<img>`,
   - **optionally**, one cell holding a **title** (plain text or inline markup,
-    with no `<a href>`), and
-  - one cell holding an `<a href>` with the item's text label.
+    with no `<a href>`),
+  - one cell holding an `<a href>` with the item's text label, and
+  - **optionally**, one cell holding a **description**.
 - Parsing is **structural, not tag-driven**: cells are matched by position
   within their group, so the wrapper tags may be `<li>`, `<div>`, or anything
   else. The inner group may also be omitted entirely, placing the image, title
@@ -85,14 +90,63 @@ Rules:
 - An item that contains no `<img>` or no `<a href>` is skipped.
 - The **title cell is optional and identified by position/content**: it is the
   cell that sits **between the image cell and the link cell** and does
-  **not** contain an `<a href>`. When present it is rendered as a caption above
-  the link; when absent the item shows only the image and the link. Items within
-  the same grid may freely mix titled and untitled entries.
+  **not** contain an `<a href>`. When present it renders as a bold lead before
+  the link label; when absent the caption is just the label. Items within the
+  same grid may freely mix titled and untitled entries.
+- The **description cell is optional** and follows the same positional rule
+  from the other side: the first cell **after** the image and link cells that
+  holds text and no `<a href>`. It renders as a muted second line beneath the
+  caption.
 - **Images MUST specify `width` and `height`** (intrinsic pixel dimensions) so
   the masonry layout can compute aspect ratios without waiting for image load.
   Images should also carry meaningful `alt` text.
 - If the widget's JS does not run (no-JS / progressive enhancement), the raw
   source markup remains readable and the links work as normal navigation.
+
+### JSON in a comment
+
+For generated pages where emitting markup is impractical, a flagged container
+whose **only content is a single HTML comment** carries its items as JSON
+inside that comment:
+
+```html
+<div data-rel="lightbox-grid" data-mode="masonry">
+  <!-- [
+    {"src": "a.jpg", "width": 400, "height": 300, "alt": "Description A",
+     "href": "/page-a", "label": "Link text A",
+     "title": "Optional Title A", "description": "Optional description A"}
+  ] -->
+</div>
+```
+
+- The comment may hold either a **bare array** of items or an **object with an
+  `items` array** (`{"items": [...]}`); nothing else is read from it.
+- Per-item fields:
+
+  | Field         | Purpose                                       | Required |
+  | ------------- | --------------------------------------------- | -------- |
+  | `src`         | Image URL                                     | yes      |
+  | `href`        | Target page opened in the lightbox            | yes      |
+  | `width`/`w`   | Intrinsic image width in px                   | strongly recommended |
+  | `height`/`h`  | Intrinsic image height in px                  | strongly recommended |
+  | `alt`         | Image alt text                                | recommended |
+  | `label`       | Link text shown in the caption                | optional |
+  | `title`       | Optional bold lead before the label           | optional |
+  | `description` / `desc` | Optional muted second line          | optional |
+
+- `title` and `description` mean exactly what they do in the markup forms, so
+  the three source styles describe the same item model.
+- Entries missing `src` or `href` are **skipped** with a `console.warn`;
+  unparseable JSON yields no items and one warning, leaving the page intact.
+- Omitted `width`/`height` fall back to `1`, which makes the aspect-ratio-driven
+  grids square that tile — supply real dimensions.
+- The container is **detected by shape**: a comment sitting alongside real
+  items is ignored, and markup always wins.
+- Because a comment renders nothing, this form has **no no-JS fallback** — the
+  gallery simply does not appear when scripting is off. Prefer one of the
+  markup forms unless generation constraints rule them out.
+- JSON in an HTML comment must not contain the sequence `-->`; `--` anywhere
+  in the comment is also invalid HTML.
 
 ## Configuration (data-attributes on the container)
 
@@ -260,7 +314,9 @@ Rationale and trade-offs:
 ## Accessibility & Progressive Enhancement (guidance)
 
 - Widget enhances existing, valid markup (lists or divs); links remain
-  functional without JS.
+  functional without JS. The **JSON-in-a-comment** form is the exception: it
+  renders nothing without scripting, and is offered only for generated pages
+  where markup is impractical.
 - Controls (arrows, toggle, close) are real focusable elements with ARIA labels.
 - Keyboard support: navigate carousel, operate toggle, close lightbox with `Esc`.
 - Respect `prefers-reduced-motion` for autoplay/transitions where feasible.
@@ -280,9 +336,12 @@ Previously-open questions, now settled and reflected in the implementation:
 - **Mobile** — links navigate directly (no modal) at/below
   `data-mobile-breakpoint` (default `640px`), and the view defaults to carousel
   (override with `data-mobile-mode`); see [Mobile Behavior](#mobile-behavior).
-- **Optional title** — an item may include a title cell between the image and
-  the link; tile and masonry sizing account for its (and the link's) rendered
-  height so rows stay height-consistent and columns pack correctly.
+- **Optional title / description** — an item may include a title cell between
+  the image and the link, and a description cell after it; tile and masonry
+  sizing account for their (and the link's) rendered height so rows stay
+  height-consistent and columns pack correctly.
+- **Three source forms** — nested lists, nested divs, or JSON inside the
+  container's only comment; all three produce the same item model.
 - **Touch** — the carousel supports finger-swipe navigation with snap.
 - **Back button** — opening the lightbox pushes a history entry so back closes
   the overlay instead of leaving the page.

@@ -135,6 +135,15 @@
   color: var(--lbg-text);
 }
 
+/* Optional description: a muted secondary line beneath the caption. */
+.lbg__desc {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--lbg-muted);
+}
+
 .lbg__image {
   display: block;
   width: 100%;

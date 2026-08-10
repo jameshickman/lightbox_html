@@ -60,6 +60,19 @@ page's main content.
    </div>
    ```
 
+   Or, for generated pages, put the items in a JSON comment that is the
+   container's only content:
+
+   ```html
+   <div data-rel="lightbox-grid" data-mode="masonry">
+     <!-- [
+       {"src": "images/a.jpg", "width": 400, "height": 300, "alt": "Aurora",
+        "href": "/pages/aurora.html", "label": "Aurora",
+        "title": "Aurora", "description": "Three nights above the tree line."}
+     ] -->
+   </div>
+   ```
+
 The script auto-initializes on `DOMContentLoaded`. Open `index.html` for a live
 demo, or see the non-technical setup guide in
 [`Lightbox-Grid-Setup-Guide.docx`](Lightbox-Grid-Setup-Guide.docx) /
@@ -73,11 +86,24 @@ demo, or see the non-technical setup guide in
 - Each **direct child** of the container (`<li>` or `<div>`) is one item
   containing an **inner group** with:
   - one cell holding an `<img>`,
-  - optionally, one cell holding a plain-text **title**, and
-  - one cell holding an `<a href>` with the item's caption.
+  - optionally, one cell holding a plain-text **title**,
+  - one cell holding an `<a href>` with the item's caption, and
+  - optionally, one cell holding a **description** (a muted second line).
 - Cells are matched **by position, not by tag**, so list and div markup work
   the same way and can be mixed. The inner group may also be dropped, putting
   the image, title and link directly inside the item.
+
+### JSON in a comment
+
+A flagged container whose **only** content is an HTML comment reads that
+comment as JSON — either a bare array of items or `{"items": [...]}`. Per item:
+`src` and `href` are required; `width`/`height` (or `w`/`h`), `alt`, `label`,
+`title` and `description` (or `desc`) are optional and mean the same as their
+markup counterparts. Entries missing `src` or `href` are skipped with a console
+warning.
+
+This form exists for generated pages. It has **no no-JS fallback** — a comment
+renders nothing — so prefer the markup forms where you can use them.
 - **Images must specify `width` and `height`** (intrinsic pixel size) so the
   grid layouts (masonry and rows) are stable before images load. Include
   meaningful `alt` text.

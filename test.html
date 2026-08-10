@@ -96,12 +96,14 @@
     </ul>
 
     <!-- Fixture D: the same contract expressed with DIVs instead of lists,
-         including one flat item (no inner wrapper) and one untitled item. -->
+         including one flat item (no inner wrapper), one untitled item, and one
+         trailing description cell after the link. -->
     <div id="fixtureD" data-rel="lightbox-grid" data-mode="masonry" data-toggle="off">
       <div><div>
         <div><img src="images/img1.svg" width="400" height="300" alt="Aurora"></div>
         <div>Aurora</div>
         <div><a href="pages/page-1.html">northern light fields</a></div>
+        <div>Long-exposure frames from three nights above the tree line.</div>
       </div></div>
       <div><div>
         <div><img src="images/img2.svg" width="400" height="520" alt="Coral"></div>
@@ -112,6 +114,34 @@
         <span>Meadow</span>
         <a href="pages/page-3.html">green rolling calm</a>
       </div>
+    </div>
+
+    <!-- Fixture E: items described as JSON in the container's only comment.
+         Uses the object-with-`items` form; one entry omits its title. -->
+    <div id="fixtureE" data-rel="lightbox-grid" data-mode="rows" data-toggle="off">
+      <!-- {
+        "items": [
+          {"src": "images/img4.svg", "width": 400, "height": 400, "alt": "Amber",
+           "href": "pages/page-4.html", "label": "golden hour glow", "title": "Amber",
+           "description": "The last twenty minutes of light."},
+          {"src": "images/img6.svg", "w": 400, "h": 340, "alt": "Lagoon",
+           "href": "pages/page-6.html", "label": "Lagoon, untitled", "desc": "Shorthand key."},
+          {"src": "images/img5.svg", "width": 400, "height": 600, "alt": "Violet",
+           "href": "pages/page-5.html", "label": "deep dusk hues", "title": "Violet"}
+        ]
+      } -->
+    </div>
+
+    <!-- Fixture F: a bare JSON array, plus one entry missing `href` that the
+         parser must skip rather than render. -->
+    <div id="fixtureF" data-rel="lightbox-grid" data-mode="masonry" data-toggle="off">
+      <!-- [
+        {"src": "images/img1.svg", "width": 400, "height": 300, "alt": "Aurora",
+         "href": "pages/page-1.html", "label": "Aurora"},
+        {"src": "images/img2.svg", "width": 400, "height": 520, "alt": "No link"},
+        {"src": "images/img3.svg", "width": 400, "height": 260, "alt": "Meadow",
+         "href": "pages/page-3.html", "label": "Meadow"}
+      ] -->
     </div>
   </div>
 
@@ -276,8 +306,57 @@
       eq(instD.items[1].title, "", "Div item without a title cell parses an empty title");
       eq(instD.items[2].title, "Meadow", "Flat div item (no inner wrapper) still parses its title");
       eq(instD.items[2].label, "green rolling calm", "Flat div item parses its link label");
+      eq(
+        instD.items[0].description,
+        "Long-exposure frames from three nights above the tree line.",
+        "Cell after the link parses as the optional description"
+      );
+      eq(instD.items[1].description, "", "Item with no trailing cell parses an empty description");
+      assert(
+        wD.querySelectorAll(".lbg__masonry .lbg__item")[0].querySelector(".lbg__desc"),
+        "Described item renders a .lbg__desc element"
+      );
       eq(wD.querySelectorAll(".lbg__masonry .lbg__item").length, 3, "Div-sourced masonry rendered 3 items");
       assert(!wD.querySelector(".lbg__modes"), "Div-sourced widget honours data-toggle=off");
+
+      // --- JSON-in-a-comment source (Fixtures E and F)
+      var fE = document.getElementById("fixtureE");
+      var wE = widgetAfter(fE);
+      var instE = window.LightboxGrid.instances[4];
+      assert(wE && wE.className.indexOf("lbg") === 0, "Fixture E (JSON comment) enhanced into .lbg root");
+      eq(instE.items.length, 3, "JSON comment ({items: [...]}) parsed 3 items");
+      eq(instE.items[0].title, "Amber", "JSON item parses its title");
+      eq(instE.items[0].label, "golden hour glow", "JSON item parses its label");
+      eq(instE.items[0].src, "images/img4.svg", "JSON item parses its src");
+      eq(instE.items[0].href, "pages/page-4.html", "JSON item parses its href");
+      eq(instE.items[0].alt, "Amber", "JSON item parses its alt text");
+      eq(instE.items[0].w, 400, "JSON item parses its width");
+      eq(instE.items[0].h, 400, "JSON item parses its height");
+      eq(instE.items[1].title, "", "JSON item without a title parses an empty title");
+      eq(instE.items[1].h, 340, "JSON item accepts the w/h shorthand");
+      eq(
+        instE.items[0].description,
+        "The last twenty minutes of light.",
+        "JSON item parses its optional description"
+      );
+      eq(instE.items[1].description, "Shorthand key.", "JSON item accepts the `desc` shorthand");
+      eq(instE.items[2].description, "", "JSON item without a description parses an empty string");
+      var rE = wE.querySelectorAll(".lbg__rows .lbg__item");
+      eq(rE.length, 3, "JSON-sourced rows rendered 3 items");
+      assert(rE[0].querySelector(".lbg__title"), "JSON-sourced titled item renders a .lbg__title");
+      assert(!rE[1].querySelector(".lbg__title"), "JSON-sourced untitled item renders NO .lbg__title");
+      eq(
+        (rE[0].querySelector(".lbg__desc").textContent || "").replace(/^\s+|\s+$/g, ""),
+        "The last twenty minutes of light.",
+        "JSON-sourced description renders in .lbg__desc"
+      );
+      assert(!rE[2].querySelector(".lbg__desc"), "JSON item without a description renders NO .lbg__desc");
+
+      var fF = document.getElementById("fixtureF");
+      var instF = window.LightboxGrid.instances[5];
+      eq(instF.items.length, 2, "Bare JSON array parsed, dropping the entry with no href");
+      eq(instF.items[1].label, "Meadow", "Remaining JSON array items keep their order");
+      assert(fF.className.indexOf("lbg-source--enhanced") > -1, "Source F hidden after enhancement");
 
       // --- Lightbox: opens on link click, injects styles, closes on Esc (async)
       testLightbox(wB, finish);

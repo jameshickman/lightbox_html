@@ -42,6 +42,17 @@
 
    `rel` is not a conformant attribute on <div>, so div containers may be
    flagged with data-rel="lightbox-grid" instead; both are recognised.
+
+   ...OR, for generated pages, the items may be inlined as JSON in a comment
+   that is the container's ONLY content:
+     <div data-rel="lightbox-grid">
+       <!-- [
+         {"src": "a.jpg", "width": 400, "height": 300, "alt": "A",
+          "href": "/page-a", "label": "Link text A", "title": "Optional Title A"}
+       ] -->
+     </div>
+   This form has no no-JS fallback (a comment renders nothing), so use it only
+   where the markup forms above are impractical.
    ========================================================================== */
 (function (window, document) {
   "use strict";
@@ -234,7 +245,102 @@
     return "";
   }
 
+  /* ---- JSON-in-a-comment source ----------------------------------------- */
+
+  // The container's sole HTML comment, when the container holds nothing but
+  // that comment (whitespace aside). Returns null for every other shape, so
+  // real markup always wins and a decorative comment beside items is ignored.
+  function loneCommentIn(node) {
+    var found = null;
+    var kids = node.childNodes;
+    for (var i = 0; i < kids.length; i++) {
+      var n = kids[i];
+      if (n.nodeType === 8 /* comment */) {
+        if (found !== null) return null; // more than one: ambiguous, bail out
+        found = n.nodeValue;
+      } else if (n.nodeType === 1 /* element */) {
+        return null; // markup present: parse it with the DOM contract
+      } else if (n.nodeType === 3 && trim(n.nodeValue) !== "") {
+        return null; // stray text
+      }
+    }
+    return found;
+  }
+
+  function isArray(v) {
+    return Object.prototype.toString.call(v) === "[object Array]";
+  }
+
+  function warn(msg) {
+    if (window.console && window.console.warn) window.console.warn(msg);
+  }
+
+  // Items described as JSON inside the container's comment. Accepts either a
+  // bare array of items or an object with an `items` array. Each entry needs
+  // at least `src` and `href`; `width`/`height` (or `w`/`h`), `alt`, `label`
+  // and `title` mirror their markup counterparts.
+  // The optional description is the first cell AFTER both the image and the
+  // link cells that carries text and no <a href> — the mirror of the title
+  // rule, which looks between them.
+  function extractDescription(item, img, anchor) {
+    var group = groupOf(item, img);
+    var cells = childElements(group);
+    var imgIdx = indexInArray(cells, childCellOf(img, group));
+    var linkIdx = indexInArray(cells, childCellOf(anchor, group));
+    if (imgIdx < 0 || linkIdx < 0) return "";
+    var after = (imgIdx > linkIdx ? imgIdx : linkIdx) + 1;
+    for (var k = after; k < cells.length; k++) {
+      if (cells[k].getElementsByTagName("a").length === 0) {
+        var t = trim(cells[k].textContent || cells[k].innerText || "");
+        if (t) return t;
+      }
+    }
+    return "";
+  }
+
+  function parseJsonItems(text) {
+    var data;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      warn("lightbox-grid: source comment is not valid JSON — " + e);
+      return [];
+    }
+
+    var list = isArray(data) ? data : data && isArray(data.items) ? data.items : null;
+    if (!list) {
+      warn("lightbox-grid: source JSON must be an array of items or an object with an `items` array.");
+      return [];
+    }
+
+    var items = [];
+    for (var i = 0; i < list.length; i++) {
+      var entry = list[i];
+      if (!entry || !entry.src || !entry.href) {
+        warn("lightbox-grid: skipping source JSON item " + i + " (needs both `src` and `href`).");
+        continue;
+      }
+      var w = toInt(entry.width != null ? entry.width : entry.w, 0);
+      var h = toInt(entry.height != null ? entry.height : entry.h, 0);
+      items.push({
+        href: "" + entry.href,
+        label: trim(entry.label),
+        title: trim(entry.title),
+        description: trim(entry.description != null ? entry.description : entry.desc),
+        src: "" + entry.src,
+        alt: trim(entry.alt),
+        w: w > 0 ? w : 1,
+        h: h > 0 ? h : 1
+      });
+    }
+    return items;
+  }
+
   function parseItems(source) {
+    // A container holding nothing but a comment carries its items as JSON.
+    var comment = loneCommentIn(source);
+    if (comment !== null) return parseJsonItems(comment);
+
     var items = [];
     var itemEls = directChildItems(source);
     for (var i = 0; i < itemEls.length; i++) {
@@ -250,6 +356,7 @@
         href: anchor.getAttribute("href"),
         label: trim(anchor.textContent || anchor.innerText || ""),
         title: extractTitle(item, img, anchor),
+        description: extractDescription(item, img, anchor),
         src: img.getAttribute("src"),
         alt: img.getAttribute("alt") || "",
         w: w > 0 ? w : 1,
@@ -658,7 +765,8 @@
 
     // Caption line. When the item supplied a title, it renders inline as a bold
     // lead followed by an em-dash and the link label ("Title — label"); with no
-    // title the caption is just the link label.
+    // title the caption is just the link label. An optional description follows
+    // on its own line beneath.
     var caption = el("span", "lbg__caption");
     if (item.title) {
       var title = el("strong", "lbg__title");
@@ -667,6 +775,11 @@
       caption.appendChild(document.createTextNode(" — "));
     }
     caption.appendChild(document.createTextNode(item.label));
+    if (item.description) {
+      var desc = el("span", "lbg__desc");
+      desc.appendChild(document.createTextNode(item.description));
+      caption.appendChild(desc);
+    }
     link.appendChild(caption);
 
     return { link: link, media: media };
