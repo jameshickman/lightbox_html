@@ -294,9 +294,11 @@
             "{ display: none !important; }" +
             "html, body { margin: 0 !important; }" +
             "body { padding: 28px !important; background: #fff; }" +
+            // The content region fills the dialog: the page's own measure caps
+            // (e.g. `max-width: 72ch`) would otherwise leave dead gutters.
             "main, article, [role='main']" +
-            "{ display: block !important; max-width: 78ch;" +
-            " margin: 0 auto !important; }"
+            "{ display: block !important; max-width: none !important;" +
+            " width: auto !important; margin: 0 !important; }"
         )
       );
       doc.head.appendChild(style);

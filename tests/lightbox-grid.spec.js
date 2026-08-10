@@ -269,6 +269,24 @@ test.describe("demo page", () => {
     await expect(page.locator("body")).not.toHaveClass(/lbg-lightbox-open/);
   });
 
+  test("overlay content is not width constrained by the page's own measure cap", async ({
+    page,
+  }) => {
+    const widget = page.locator(".lbg").nth(2);
+    await widget.locator(".lbg__masonry .lbg__link").first().click();
+    await expect(page.locator(".lbg-lightbox")).toHaveClass(/is-open/);
+
+    const dialog = await page.locator(".lbg-lightbox__dialog").boundingBox();
+    const frame = page.frameLocator(".lbg-lightbox__frame");
+    const main = await frame.locator("main").first().boundingBox();
+
+    // page.css caps `.site-main article` at 72ch (~700px); the injected styles
+    // must override it so the content tracks the (wide) dialog instead.
+    const article = await frame.locator("article").first().boundingBox();
+    expect(main.width).toBeGreaterThan(dialog.width * 0.9);
+    expect(article.width).toBeGreaterThan(dialog.width * 0.85);
+  });
+
   test("close (×) button dismisses the lightbox", async ({ page }) => {
     const widget = page.locator(".lbg").nth(2);
     await widget.locator(".lbg__masonry .lbg__link").first().click();

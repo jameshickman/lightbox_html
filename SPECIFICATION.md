@@ -162,6 +162,9 @@ When an item's link is activated:
        regions remain visible while the surrounding chrome is hidden.
      - **Hide:** `<nav>`, `<header>`, `<footer>`, and their ARIA equivalents
        (`[role="navigation"]`, `[role="banner"]`, `[role="contentinfo"]`).
+   - The kept region is left **unconstrained in width** (`max-width: none`):
+     the dialog is already inset from the viewport, so a page's own measure cap
+     (e.g. `max-width: 72ch`) would only add dead gutters inside it.
    - (The original spec's "nsv" is read as a typo for the **nav** section.)
 4. The overlay provides a close affordance (button, `Esc` key, and backdrop
    click), returns focus to the triggering link on close, and traps focus while
