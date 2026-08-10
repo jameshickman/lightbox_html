@@ -32,7 +32,8 @@
   /* Lightbox overlay tokens */
   --lbg-overlay-bg: rgba(6, 8, 12, 0.78);
   --lbg-dialog-bg: #ffffff;
-  --lbg-dialog-max-w: 960px;
+  --lbg-dialog-inset: 80px; /* bare viewport left visible either side of the dialog */
+  --lbg-dialog-max-w: calc(100vw - 2 * var(--lbg-dialog-inset));
 }
 
 /* ---- Root block ---------------------------------------------------------- */
@@ -307,7 +308,7 @@
   display: none;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 24px var(--lbg-dialog-inset, 80px);
 }
 
 .lbg-lightbox.is-open {
@@ -328,7 +329,7 @@
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: var(--lbg-dialog-max-w, 960px);
+  max-width: var(--lbg-dialog-max-w, calc(100vw - 160px));
   height: 82vh;
   background: var(--lbg-dialog-bg, #fff);
   border-radius: 12px;
@@ -392,6 +393,13 @@
 /* Prevent background scroll while the lightbox is open. */
 .lbg-lightbox-open {
   overflow: hidden;
+}
+
+/* Narrow screens cannot spare 80px per side — fall back to a thin margin. */
+@media (max-width: 640px) {
+  :root {
+    --lbg-dialog-inset: 16px;
+  }
 }
 
 /* ==========================================================================
